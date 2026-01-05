@@ -1,10 +1,10 @@
 import { Header, Footer } from '@/components/layout';
 import {
   Hero,
-  FeatureShowcase,
-  SocialProof,
-  AgentCapabilities,
-  CallToAction,
+  LogoGarden,
+  FeatureAgent,
+  FeatureAutocomplete,
+  Frontier,
 } from '@/components/sections';
 
 export default function Home() {
@@ -13,10 +13,10 @@ export default function Home() {
       <Header />
       <main id="main-content">
         <Hero />
-        <FeatureShowcase />
-        <SocialProof />
-        <AgentCapabilities />
-        <CallToAction />
+        <LogoGarden />
+        <FeatureAgent />
+        <FeatureAutocomplete />
+        <Frontier />
       </main>
       <Footer />
     </>

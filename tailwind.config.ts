@@ -9,92 +9,83 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        theme: {
-          bg: 'var(--color-theme-bg)',
-          fg: 'var(--color-theme-fg)',
-          card: {
-            DEFAULT: 'var(--color-theme-card)',
-            hover: 'var(--color-theme-card-hover)',
-            border: 'var(--color-theme-card-border)',
-          },
-          accent: {
-            DEFAULT: 'var(--color-theme-accent)',
-            hover: 'var(--color-theme-accent-hover)',
-          },
-          text: {
-            DEFAULT: 'var(--color-theme-text)',
-            secondary: 'var(--color-theme-text-secondary)',
-            tertiary: 'var(--color-theme-text-tertiary)',
-          },
-          border: {
-            DEFAULT: 'var(--color-theme-border)',
-            subtle: 'var(--color-theme-border-subtle)',
-          },
+        // Warm backgrounds
+        bg: 'var(--color-bg)',
+        card: {
+          DEFAULT: 'var(--color-card)',
+          '02': 'var(--color-card-02)',
+          '03': 'var(--color-card-03)',
+          '04': 'var(--color-card-04)',
+        },
+        // Orange accent
+        accent: {
+          DEFAULT: 'var(--color-accent)',
+          hover: 'var(--color-accent-hover)',
+        },
+        // Text
+        text: {
+          DEFAULT: 'var(--color-text)',
+          secondary: 'var(--color-text-secondary)',
+          tertiary: 'var(--color-text-tertiary)',
+        },
+        // Borders - subtle
+        border: {
+          '01': 'var(--color-border-01)',
+          '02': 'var(--color-border-02)',
+          '03': 'var(--color-border-03)',
+        },
+        // Syntax
+        ansi: {
+          green: 'var(--color-ansi-green)',
+          red: 'var(--color-ansi-red)',
         },
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-mono)', 'monospace'],
+        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        mono: ['SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       fontSize: {
-        'display-2xl': ['4.5rem', { lineHeight: '1.05', letterSpacing: '-0.03em' }],
-        'display-xl': ['3.5rem', { lineHeight: '1.1', letterSpacing: '-0.025em' }],
-        'display-lg': ['2.5rem', { lineHeight: '1.15', letterSpacing: '-0.02em' }],
-        'display-md': ['1.875rem', { lineHeight: '1.25', letterSpacing: '-0.015em' }],
-        'display-sm': ['1.5rem', { lineHeight: '1.3', letterSpacing: '-0.01em' }],
-        'body-lg': ['1.125rem', { lineHeight: '1.6' }],
-        'body-md': ['1rem', { lineHeight: '1.6' }],
-        'body-sm': ['0.875rem', { lineHeight: '1.5' }],
-        'body-xs': ['0.75rem', { lineHeight: '1.5' }],
+        sm: ['0.875rem', { lineHeight: '1.5' }],
+        base: ['1rem', { lineHeight: '1.5' }],
+        md: ['1.375rem', { lineHeight: '1.3' }],
+        lg: ['1.625rem', { lineHeight: '1.25', letterSpacing: '-0.0125em' }],
+        xl: ['2.25rem', { lineHeight: '1.15', letterSpacing: '-0.02em' }],
+        '2xl': ['3.25rem', { lineHeight: '1.1', letterSpacing: '-0.025em' }],
       },
       spacing: {
-        '18': '4.5rem',
-        '22': '5.5rem',
-        '30': '7.5rem',
+        'g0.5': 'var(--spacing-g0-5)',
+        'g0.75': 'var(--spacing-g0-75)',
+        g1: 'var(--spacing-g1)',
+        'g1.5': 'var(--spacing-g1-5)',
+        'g1.75': 'var(--spacing-g1-75)',
+        g2: 'var(--spacing-g2)',
+        'g2.5': 'var(--spacing-g2-5)',
+        g3: 'var(--spacing-g3)',
+        'v0.5': 'var(--spacing-v0-5)',
+        v1: 'var(--spacing-v1)',
+        'v1.5': 'var(--spacing-v1-5)',
+        v2: 'var(--spacing-v2)',
+        'v2.5': 'var(--spacing-v2-5)',
+        v3: 'var(--spacing-v3)',
+        v4: 'var(--spacing-v4)',
+        v5: 'var(--spacing-v5)',
+        v6: 'var(--spacing-v6)',
       },
       maxWidth: {
-        container: '1280px',
-        prose: '720px',
+        container: 'var(--max-width)',
       },
       borderRadius: {
-        '4xl': '2rem',
+        xs: 'var(--radius-xs)',
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        full: 'var(--radius-full)',
+      },
+      transitionDuration: {
+        DEFAULT: 'var(--duration)',
+        slow: 'var(--duration-slow)',
       },
       transitionTimingFunction: {
-        'out-spring': 'cubic-bezier(0.25, 1, 0.5, 1)',
-      },
-      keyframes: {
-        'fade-in': {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        'fade-up': {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        'fade-down': {
-          '0%': { opacity: '0', transform: 'translateY(-10px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        shimmer: {
-          '0%': { backgroundPosition: '200% 0' },
-          '100%': { backgroundPosition: '-200% 0' },
-        },
-        blink: {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0' },
-        },
-        'typing-cursor': {
-          '0%, 100%': { borderColor: 'var(--color-theme-accent)' },
-          '50%': { borderColor: 'transparent' },
-        },
-      },
-      animation: {
-        'fade-in': 'fade-in 0.5s ease-out forwards',
-        'fade-up': 'fade-up 0.6s ease-out forwards',
-        'fade-down': 'fade-down 0.3s ease-out forwards',
-        shimmer: 'shimmer 2s linear infinite',
-        blink: 'blink 1s step-end infinite',
-        'typing-cursor': 'typing-cursor 1s step-end infinite',
+        DEFAULT: 'var(--ease)',
       },
     },
   },

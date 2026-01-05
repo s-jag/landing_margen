@@ -1,178 +1,177 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-
 export function ProductMockup() {
   return (
-    <div className="relative w-full max-w-5xl mx-auto">
-      {/* Glow effect behind the mockup */}
-      <div className="absolute inset-0 bg-gradient-radial from-theme-accent/10 to-transparent blur-3xl" />
+    <div className="mockup-window max-w-5xl mx-auto">
+      {/* Title bar */}
+      <div className="mockup-titlebar">
+        <div className="mockup-dots">
+          <span className="mockup-dot" />
+          <span className="mockup-dot" />
+          <span className="mockup-dot" />
+        </div>
+        <span className="text-xs text-text-tertiary">Margen</span>
+        <div className="w-16" />
+      </div>
 
-      {/* Main window */}
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-        className="relative mockup-window border border-theme-border shadow-2xl"
-      >
-        {/* Title bar */}
-        <div className="mockup-titlebar">
-          <div className="flex items-center gap-2">
-            <span className="mockup-dot-red" />
-            <span className="mockup-dot-yellow" />
-            <span className="mockup-dot-green" />
+      {/* Content */}
+      <div className="flex min-h-[500px]">
+        {/* Sidebar */}
+        <div className="hidden md:block w-60 border-r border-border-01 bg-card-02 p-3">
+          <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">
+            IN PROGRESS <span className="text-text-secondary">3</span>
           </div>
-          <span className="text-xs text-theme-text-tertiary font-mono">Margen - Tax Research</span>
-          <div className="w-16" />
+          <SidebarItem icon="⟳" label="Client Returns - Q4..." status="Generating" />
+          <SidebarItem icon="⟳" label="Schedule K-1 Analysis..." status="Generating" />
+          <SidebarItem icon="⟳" label="IRC 280A Research..." status="Generating" />
+
+          <div className="text-xs text-text-tertiary uppercase tracking-wider mt-6 mb-2">
+            READY FOR REVIEW <span className="text-text-secondary">3</span>
+          </div>
+          <SidebarItem icon="✓" label="Form 1040 - Smith..." time="now" status="+162-37 · Done, configurabl..." active />
+          <SidebarItem icon="✓" label="Partnership K-1..." time="30m" status="+37-0 · Set up Rules f..." />
+          <SidebarItem icon="✓" label="Estate Tax Planning..." time="45m" status="+135-21 · Estate analysis" />
         </div>
 
-        {/* Content area */}
-        <div className="flex h-[400px] md:h-[500px]">
-          {/* Sidebar */}
-          <div className="hidden md:flex flex-col w-56 border-r border-theme-border bg-[#151515] p-3">
-            <div className="mb-4">
-              <div className="text-xs text-theme-text-tertiary uppercase tracking-wider mb-2">Documents</div>
-              <SidebarItem active>Form 1040 - 2024</SidebarItem>
-              <SidebarItem>Schedule C</SidebarItem>
-              <SidebarItem>W-2 Employer</SidebarItem>
-              <SidebarItem>1099-NEC</SidebarItem>
-            </div>
-            <div className="mt-auto">
-              <div className="text-xs text-theme-text-tertiary uppercase tracking-wider mb-2">Research</div>
-              <SidebarItem>IRC Section 162</SidebarItem>
-              <SidebarItem>Home Office Deduction</SidebarItem>
-            </div>
-          </div>
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col">
+          {/* Agent response */}
+          <div className="flex-1 p-6 overflow-auto">
+            <div className="max-w-2xl">
+              <h3 className="text-base font-medium text-text mb-4">
+                Home Office Deduction Analysis
+              </h3>
 
-          {/* Main content */}
-          <div className="flex-1 flex flex-col">
-            {/* Document viewer area */}
-            <div className="flex-1 p-4 border-b border-theme-border overflow-hidden">
-              <div className="h-full bg-[#1a1a1a] rounded-lg p-4 overflow-hidden">
-                <div className="text-sm text-theme-text-secondary mb-3 font-mono">Form 1040 - U.S. Individual Income Tax Return</div>
-                <div className="space-y-2">
-                  <FormLine label="Filing Status" value="Married Filing Jointly" />
-                  <FormLine label="Total Income" value="$185,420" highlight />
-                  <FormLine label="Adjusted Gross Income" value="$162,830" />
-                  <FormLine label="Standard Deduction" value="$29,200" />
-                  <FormLine label="Taxable Income" value="$133,630" highlight />
+              <p className="text-sm text-text-secondary mb-4">
+                Help me understand the requirements for the home office deduction under IRC Section 280A and calculate the potential deduction for a client using 300 sq ft of their 2,000 sq ft home.
+              </p>
+
+              <div className="bg-card rounded-xs border border-border-01 p-3 mb-4">
+                <div className="flex items-center gap-2 text-xs text-text-tertiary mb-2">
+                  <span>📄</span>
+                  <span>IRC_Section_280A.pdf</span>
+                  <span className="text-ansi-green">+156</span>
+                  <span className="text-ansi-red">-0</span>
+                </div>
+              </div>
+
+              <p className="text-sm text-text mb-4">
+                Now let me apply the safe harbor method from Rev. Proc. 2013-13 to calculate the simplified deduction:
+              </p>
+
+              <div className="bg-card rounded-xs border border-border-01 p-3 mb-4">
+                <div className="flex items-center gap-2 text-xs text-text-tertiary mb-2">
+                  <span>📄</span>
+                  <span>deduction_calc.xlsx</span>
+                  <span className="text-ansi-green">+24</span>
+                  <span className="text-ansi-red">-6</span>
+                </div>
+              </div>
+
+              <p className="text-sm text-text mb-4">
+                Done. The client qualifies for a <span className="text-text font-medium">$1,500 simplified deduction</span> (300 sq ft × $5/sq ft) under the safe harbor method.
+              </p>
+
+              <ul className="text-sm text-text-secondary space-y-1 mb-6">
+                <li>• <span className="font-medium text-text">Qualification:</span> Regular and exclusive business use confirmed</li>
+                <li>• <span className="font-medium text-text">Method:</span> Safe harbor (Rev. Proc. 2013-13)</li>
+                <li>• <span className="font-medium text-text">Calculation:</span> 300 sq ft × $5 = $1,500 max</li>
+              </ul>
+
+              {/* Input area */}
+              <div className="bg-card rounded-xs border border-border-01 p-3">
+                <div className="text-sm text-text-tertiary">
+                  Plan, search, research anything...
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-card-03 px-2 py-0.5 rounded text-text-secondary">Agent</span>
+                    <span className="text-xs text-text-tertiary">Claude Sonnet 4</span>
+                  </div>
+                  <button className="w-6 h-6 rounded-full bg-text flex items-center justify-center">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="2" className="text-bg" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
-
-            {/* AI Chat panel */}
-            <div className="h-48 p-4 bg-[#151515]">
-              <div className="text-xs text-theme-text-tertiary mb-3 flex items-center gap-2">
-                <span className="inline-block w-2 h-2 rounded-full bg-theme-accent animate-pulse" />
-                AI Assistant
-              </div>
-              <ChatMessage type="user">
-                Can I deduct my home office expenses?
-              </ChatMessage>
-              <ChatMessage type="ai">
-                Based on IRC Section 280A, you may qualify for the home office deduction if you use a portion of your home{' '}
-                <span className="text-theme-accent">exclusively and regularly</span> for business...
-                <span className="inline-block ml-1 w-2 h-4 bg-theme-accent animate-typing-cursor" />
-              </ChatMessage>
-            </div>
-          </div>
-
-          {/* Right panel - Citations */}
-          <div className="hidden lg:flex flex-col w-64 border-l border-theme-border bg-[#151515] p-3">
-            <div className="text-xs text-theme-text-tertiary uppercase tracking-wider mb-3">Sources</div>
-            <CitationCard
-              title="IRC Section 280A"
-              description="Disallowance of certain expenses in connection with business use of home"
-            />
-            <CitationCard
-              title="Publication 587"
-              description="Business Use of Your Home (Including Use by Daycare Providers)"
-            />
-            <CitationCard
-              title="Rev. Proc. 2013-13"
-              description="Safe harbor for home office deduction"
-            />
           </div>
         </div>
-      </motion.div>
+
+        {/* Right panel - code/diff view */}
+        <div className="hidden lg:block w-80 border-l border-border-01 bg-bg">
+          {/* Tabs */}
+          <div className="flex border-b border-border-01">
+            <div className="px-4 py-2 text-xs text-text-secondary border-b border-text">deduction_calc.xlsx</div>
+            <div className="px-4 py-2 text-xs text-text-tertiary">sources.pdf</div>
+          </div>
+
+          {/* Code content */}
+          <div className="p-4 font-mono text-xs">
+            <CodeLine num="1" content="# Home Office Deduction Calculator" />
+            <CodeLine num="2" content="" />
+            <CodeLine num="3" content="# Client: Smith, John" added />
+            <CodeLine num="4" content="# Tax Year: 2024" added />
+            <CodeLine num="5" content="" />
+            <CodeLine num="6" content="home_sqft = 2000" />
+            <CodeLine num="7" content="office_sqft = 300" />
+            <CodeLine num="8" content="rate_per_sqft = 5  # Safe harbor" added />
+            <CodeLine num="9" content="" />
+            <CodeLine num="10" content="# Simplified Method (Rev Proc 2013-13)" added />
+            <CodeLine num="11" content="deduction = min(office_sqft, 300) * rate_per_sqft" added />
+            <CodeLine num="12" content="# Result: $1,500" added />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
 function SidebarItem({
-  children,
+  icon,
+  label,
+  status,
+  time,
   active = false,
 }: {
-  children: React.ReactNode;
+  icon: string;
+  label: string;
+  status: string;
+  time?: string;
   active?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        'px-3 py-2 rounded-md text-sm cursor-pointer transition-colors',
-        active
-          ? 'bg-theme-card text-theme-text'
-          : 'text-theme-text-secondary hover:bg-theme-card hover:text-theme-text'
-      )}
-    >
-      {children}
+    <div className={`px-2 py-1.5 rounded text-sm cursor-pointer ${active ? 'bg-card-03' : 'hover:bg-card-03'}`}>
+      <div className="flex items-center gap-2">
+        <span className="text-text-tertiary">{icon}</span>
+        <span className={`truncate ${active ? 'text-text' : 'text-text-secondary'}`}>{label}</span>
+        {time && <span className="text-xs text-text-tertiary ml-auto">{time}</span>}
+      </div>
+      <div className="text-xs text-text-tertiary mt-0.5 ml-6 truncate">{status}</div>
     </div>
   );
 }
 
-function FormLine({
-  label,
-  value,
-  highlight = false,
+function CodeLine({
+  num,
+  content,
+  added = false,
+  removed = false,
 }: {
-  label: string;
-  value: string;
-  highlight?: boolean;
+  num: string;
+  content: string;
+  added?: boolean;
+  removed?: boolean;
 }) {
   return (
-    <div className="flex justify-between items-center py-1 border-b border-theme-border-subtle">
-      <span className="text-sm text-theme-text-secondary">{label}</span>
-      <span className={cn('text-sm font-mono', highlight ? 'text-theme-accent' : 'text-theme-text')}>
-        {value}
+    <div className={`flex ${added ? 'bg-ansi-green/10' : removed ? 'bg-ansi-red/10' : ''}`}>
+      <span className="w-8 text-text-tertiary select-none">{num}</span>
+      {added && <span className="text-ansi-green mr-1">+</span>}
+      {removed && <span className="text-ansi-red mr-1">-</span>}
+      <span className={added ? 'text-ansi-green' : removed ? 'text-ansi-red' : 'text-text-secondary'}>
+        {content}
       </span>
-    </div>
-  );
-}
-
-function ChatMessage({
-  type,
-  children,
-}: {
-  type: 'user' | 'ai';
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        'text-sm mb-2',
-        type === 'user' ? 'text-theme-text-secondary' : 'text-theme-text'
-      )}
-    >
-      <span className={cn('font-medium mr-2', type === 'ai' && 'text-theme-accent')}>
-        {type === 'user' ? 'You:' : 'Margen:'}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-function CitationCard({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="p-3 rounded-lg bg-theme-card border border-theme-border mb-2 hover:border-theme-accent/50 transition-colors cursor-pointer">
-      <div className="text-sm font-medium text-theme-text mb-1">{title}</div>
-      <div className="text-xs text-theme-text-tertiary line-clamp-2">{description}</div>
     </div>
   );
 }
