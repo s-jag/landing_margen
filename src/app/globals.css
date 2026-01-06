@@ -476,3 +476,43 @@
 .margen-highlight {
   color: var(--color-accent);
 }
+
+/* ============================================
+   LEDGER GRID - Tax/Finance Visual DNA
+   ============================================ */
+
+/* Subtle accounting ledger grid pattern */
+.ledger-grid {
+  position: relative;
+}
+
+.ledger-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    /* Horizontal lines - more prominent, like ruled paper */
+    repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 39px,
+      rgba(237, 236, 236, 0.03) 39px,
+      rgba(237, 236, 236, 0.03) 40px
+    ),
+    /* Vertical lines - fainter, like spreadsheet columns */
+    repeating-linear-gradient(
+      to right,
+      transparent,
+      transparent 79px,
+      rgba(237, 236, 236, 0.015) 79px,
+      rgba(237, 236, 236, 0.015) 80px
+    );
+  z-index: 0;
+}
+
+/* Ensure content stays above the grid */
+.ledger-grid > * {
+  position: relative;
+  z-index: 1;
+}

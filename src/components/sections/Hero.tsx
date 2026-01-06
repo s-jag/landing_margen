@@ -3,7 +3,7 @@ import { ProductMockup } from '@/components/features/ProductMockup';
 
 export function Hero() {
   return (
-    <section className="pt-[120px] pb-v4 px-g2">
+    <section className="pt-[120px] pb-v4 px-g2 ledger-grid">
       <div className="mx-auto max-w-container">
         {/* Headline - LEFT ALIGNED, not centered */}
         <div className="max-w-2xl mb-v2">

@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 export function Frontier() {
   return (
-    <section className="py-v4 px-g2 bg-card">
+    <section className="py-v4 px-g2 bg-card ledger-grid overflow-hidden">
       <div className="mx-auto max-w-container">
         {/* Section header - LEFT aligned */}
         <h2 className="text-xl text-text mb-v2">
