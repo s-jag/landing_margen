@@ -398,33 +398,37 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Input Area - GROUNDED */}
-          <div className="border-t border-border-02 p-2 bg-card">
+          {/* Input Area - COMPACT INLINE */}
+          <div className="border-t border-border-02 px-2 py-1.5 bg-card">
             <div className="max-w-[680px] mx-auto">
               <div className="bg-card-02 border border-border-02 rounded-md overflow-hidden focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/20 transition-all">
-                <textarea
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={`Ask about ${selectedClient.name}'s tax situation...`}
-                  className="w-full bg-white/[0.02] text-sm text-text placeholder:text-text-tertiary resize-none outline-none px-4 py-2"
-                  rows={1}
-                />
-                <div className="flex items-center justify-between px-3 py-2 bg-card-03/50">
-                  <div className="flex items-center gap-2">
-                    <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
+                <div className="flex items-center gap-3 px-3 py-2">
+                  {/* Left controls */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button className="p-1.5 text-text-tertiary hover:text-text-secondary hover:bg-card-03 rounded transition-colors">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                       </svg>
-                      Attach
                     </button>
-                    <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
-                      <span>Claude Sonnet 4</span>
+                    <button className="flex items-center gap-1 px-2 py-1 text-xs text-text-tertiary hover:text-text-secondary hover:bg-card-03 rounded transition-colors">
+                      <span>Claude 4</span>
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
                   </div>
-                  <button className="px-5 py-2 bg-accent text-bg text-sm font-medium rounded-full hover:bg-accent/90 transition-colors">
+
+                  {/* Input - grows to fill */}
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder={`Ask about ${selectedClient.name}'s tax situation...`}
+                    className="flex-1 bg-transparent text-sm text-text placeholder:text-text-tertiary outline-none min-w-0"
+                  />
+
+                  {/* Send button */}
+                  <button className="px-4 py-1.5 bg-accent text-bg text-sm font-medium rounded-full hover:bg-accent/90 transition-colors flex-shrink-0">
                     Send
                   </button>
                 </div>
