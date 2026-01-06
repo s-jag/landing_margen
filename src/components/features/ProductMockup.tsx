@@ -13,28 +13,22 @@ const LOOP_PAUSE = 4000;         // Pause before restarting
 const CONTENT = {
   question: "Help me understand the requirements for the home office deduction under IRC Section 280A and calculate the potential deduction for a client using 300 sq ft of their 2,000 sq ft home.",
   paragraph1: "I found the relevant guidance in IRC Section 280A. Let me analyze the requirements for the home office deduction.",
-  file1: { name: "IRC_Section_280A.pdf", added: 156, removed: 0 },
+  file1: { name: "IRC_Section_280A.pdf", pages: 156 },
   paragraph2: "Now let me apply the safe harbor method from Rev. Proc. 2013-13 to calculate the simplified deduction:",
-  file2: { name: "deduction_calc.xlsx", added: 24, removed: 6 },
+  file2: { name: "deduction_calc.xlsx", rows: 24 },
   result: "Done. The client qualifies for a $1,500 simplified deduction (300 sq ft × $5/sq ft) under the safe harbor method.",
   bullets: [
     { label: "Qualification:", value: "Regular and exclusive business use confirmed" },
     { label: "Method:", value: "Safe harbor (Rev. Proc. 2013-13)" },
     { label: "Calculation:", value: "300 sq ft × $5 = $1,500 max" },
   ],
-  codeLines: [
-    { num: "1", content: "# Home Office Deduction Calculator", added: false },
-    { num: "2", content: "", added: false },
-    { num: "3", content: "# Client: Smith, John", added: true },
-    { num: "4", content: "# Tax Year: 2024", added: true },
-    { num: "5", content: "", added: false },
-    { num: "6", content: "home_sqft = 2000", added: false },
-    { num: "7", content: "office_sqft = 300", added: false },
-    { num: "8", content: "rate_per_sqft = 5  # Safe harbor", added: true },
-    { num: "9", content: "", added: false },
-    { num: "10", content: "# Simplified Method (Rev Proc 2013-13)", added: true },
-    { num: "11", content: "deduction = min(office_sqft, 300) * rate_per_sqft", added: true },
-    { num: "12", content: "# Result: $1,500", added: true },
+  spreadsheet: [
+    { row: 1, cells: ["Description", "Sq Ft", "Rate", "Amount"], isHeader: true },
+    { row: 2, cells: ["Total Home", "2,000", "", ""], isHeader: false },
+    { row: 3, cells: ["Office Space", "300", "$5.00", "$1,500"], isHeader: false, isNew: true },
+    { row: 4, cells: ["Business Use %", "15%", "", ""], isHeader: false, isNew: true },
+    { row: 5, cells: ["", "", "", ""], isHeader: false },
+    { row: 6, cells: ["Deduction", "", "", "$1,500"], isHeader: false, isNew: true, isTotal: true },
   ],
 };
 
@@ -98,13 +92,11 @@ function TypeWriter({
 // File card with slide-in animation
 function FileCard({
   name,
-  added,
-  removed,
+  info,
   visible,
 }: {
   name: string;
-  added: number;
-  removed: number;
+  info: string;
   visible: boolean;
 }) {
   return (
@@ -116,37 +108,52 @@ function FileCard({
       <div className="flex items-center gap-2 text-xs text-text-tertiary">
         <span>📄</span>
         <span>{name}</span>
-        <span className="text-ansi-green">+{added}</span>
-        <span className="text-ansi-red">-{removed}</span>
+        <span className="text-text-secondary">{info}</span>
       </div>
     </div>
   );
 }
 
-// Code line with fade-in
-function CodeLine({
-  num,
-  content,
-  added = false,
+// Spreadsheet row with animation
+function SpreadsheetRow({
+  rowNum,
+  cells,
+  isHeader = false,
+  isNew = false,
+  isTotal = false,
   visible,
 }: {
-  num: string;
-  content: string;
-  added?: boolean;
+  rowNum: number;
+  cells: string[];
+  isHeader?: boolean;
+  isNew?: boolean;
+  isTotal?: boolean;
   visible: boolean;
 }) {
   return (
-    <div
-      className={`flex transition-opacity duration-150 ease-out ${
+    <tr
+      className={`transition-opacity duration-200 ease-out border-b border-border-01 ${
         visible ? 'opacity-100' : 'opacity-0'
-      } ${added ? 'bg-ansi-green/10' : ''}`}
+      } ${isNew ? 'bg-ansi-green/10' : ''}`}
     >
-      <span className="w-8 text-text-tertiary select-none">{num}</span>
-      {added && <span className="text-ansi-green mr-1">+</span>}
-      <span className={added ? 'text-ansi-green' : 'text-text-secondary'}>
-        {content}
-      </span>
-    </div>
+      <td className="w-6 py-1.5 text-text-tertiary text-center">{rowNum}</td>
+      {cells.map((cell, i) => (
+        <td
+          key={i}
+          className={`py-1.5 px-2 ${
+            isHeader
+              ? 'text-text-secondary font-medium'
+              : isTotal
+              ? 'text-text font-medium'
+              : isNew
+              ? 'text-ansi-green'
+              : 'text-text-secondary'
+          }`}
+        >
+          {cell}
+        </td>
+      ))}
+    </tr>
   );
 }
 
@@ -169,11 +176,11 @@ function SidebarItem({
   return (
     <div className={`px-2 py-1.5 rounded text-sm cursor-pointer ${active ? 'bg-card-03' : 'hover:bg-card-03'}`}>
       <div className="flex items-center gap-2">
-        <span className={`text-text-tertiary ${spinning ? 'spin inline-block' : ''}`}>{icon}</span>
-        <span className={`truncate ${active ? 'text-text' : 'text-text-secondary'}`}>{label}</span>
-        {time && <span className="text-xs text-text-tertiary ml-auto">{time}</span>}
+        <span className={`text-text-secondary ${spinning ? 'spin inline-block' : ''}`}>{icon}</span>
+        <span className={`truncate ${active ? 'text-text' : 'text-text'}`}>{label}</span>
+        {time && <span className="text-xs text-text-secondary ml-auto">{time}</span>}
       </div>
-      <div className="text-xs text-text-tertiary mt-0.5 ml-6 truncate">{status}</div>
+      <div className="text-xs text-text-secondary mt-0.5 ml-6 truncate">{status}</div>
     </div>
   );
 }
@@ -182,7 +189,7 @@ function SidebarItem({
 export function ProductMockup() {
   // Animation phase state machine
   const [phase, setPhase] = useState(0);
-  const [visibleCodeLines, setVisibleCodeLines] = useState(0);
+  const [visibleRows, setVisibleRows] = useState(0);
   const [key, setKey] = useState(0); // For resetting animation
 
   // Phase progression callbacks
@@ -192,27 +199,27 @@ export function ProductMockup() {
 
   // Reset and loop
   useEffect(() => {
-    if (phase === 7) {
-      // All text done, start code lines
-      const showCodeLines = () => {
-        let lineIndex = 0;
+    if (phase === 6) {
+      // All text done, start spreadsheet rows
+      const showRows = () => {
+        let rowIndex = 0;
         const interval = setInterval(() => {
-          if (lineIndex < CONTENT.codeLines.length) {
-            setVisibleCodeLines((v) => v + 1);
-            lineIndex++;
+          if (rowIndex < CONTENT.spreadsheet.length) {
+            setVisibleRows((v) => v + 1);
+            rowIndex++;
           } else {
             clearInterval(interval);
             // Schedule loop restart
             setTimeout(() => {
               setPhase(0);
-              setVisibleCodeLines(0);
+              setVisibleRows(0);
               setKey((k) => k + 1);
             }, LOOP_PAUSE);
           }
         }, CODE_LINE_DELAY);
         return () => clearInterval(interval);
       };
-      const cleanup = showCodeLines();
+      const cleanup = showRows();
       return cleanup;
     }
   }, [phase]);
@@ -244,9 +251,9 @@ export function ProductMockup() {
           <div className="text-xs text-text-tertiary uppercase tracking-wider mt-6 mb-2">
             READY FOR REVIEW <span className="text-text-secondary">3</span>
           </div>
-          <SidebarItem icon="✓" label="Form 1040 - Smith..." time="now" status="+162-37 · Done, configurabl..." active />
-          <SidebarItem icon="✓" label="Partnership K-1..." time="30m" status="+37-0 · Set up Rules f..." />
-          <SidebarItem icon="✓" label="Estate Tax Planning..." time="45m" status="+135-21 · Estate analysis" />
+          <SidebarItem icon="✓" label="Form 1040 - Smith..." time="Active" status="Ready for review" active />
+          <SidebarItem icon="✓" label="Partnership K-1..." time="30m" status="37 items extracted" />
+          <SidebarItem icon="✓" label="Estate Tax Planning..." time="45m" status="Estate analysis complete" />
         </div>
 
         {/* Main content area */}
@@ -277,41 +284,32 @@ export function ProductMockup() {
               {/* Phase 1: Show file card 1 */}
               <FileCard
                 name={CONTENT.file1.name}
-                added={CONTENT.file1.added}
-                removed={CONTENT.file1.removed}
+                info={`${CONTENT.file1.pages} pages analyzed`}
                 visible={phase >= 1}
               />
 
               {/* Phase 2: Type paragraph 2 */}
               {phase >= 1 && (
                 <p className="text-sm text-text mb-4 min-h-[24px]">
-                  {phase >= 2 ? (
-                    <TypeWriter
-                      text={CONTENT.paragraph2}
-                      onComplete={() => setTimeout(advancePhase, FILE_CARD_DELAY)}
-                    />
-                  ) : (
-                    <TypeWriter
-                      text={CONTENT.paragraph2}
-                      delay={0}
-                      onComplete={() => setTimeout(advancePhase, FILE_CARD_DELAY)}
-                    />
-                  )}
+                  <TypeWriter
+                    text={CONTENT.paragraph2}
+                    delay={100}
+                    onComplete={() => setTimeout(advancePhase, FILE_CARD_DELAY)}
+                  />
                 </p>
               )}
 
-              {/* Phase 3: Show file card 2 */}
+              {/* Phase 2: Show file card 2 */}
               <FileCard
                 name={CONTENT.file2.name}
-                added={CONTENT.file2.added}
-                removed={CONTENT.file2.removed}
-                visible={phase >= 3}
+                info={`${CONTENT.file2.rows} rows updated`}
+                visible={phase >= 2}
               />
 
-              {/* Phase 4: Type result */}
-              {phase >= 3 && (
+              {/* Phase 3: Type result */}
+              {phase >= 2 && (
                 <p className="text-sm text-text mb-4 min-h-[24px]">
-                  {phase >= 4 ? (
+                  {phase >= 3 ? (
                     <span>
                       Done. The client qualifies for a <span className="text-text font-medium">$1,500 simplified deduction</span> (300 sq ft × $5/sq ft) under the safe harbor method.
                     </span>
@@ -324,14 +322,14 @@ export function ProductMockup() {
                 </p>
               )}
 
-              {/* Phase 5: Show bullets one by one */}
-              {phase >= 5 && (
+              {/* Phase 4: Show bullets one by one */}
+              {phase >= 4 && (
                 <ul className="text-sm text-text-secondary space-y-1 mb-6">
                   {CONTENT.bullets.map((bullet, i) => (
                     <li
                       key={i}
                       className={`transition-opacity duration-200 ${
-                        phase >= 5 + i * 0.5 ? 'opacity-100' : 'opacity-0'
+                        phase >= 4 + i * 0.5 ? 'opacity-100' : 'opacity-0'
                       }`}
                       style={{ transitionDelay: `${i * 150}ms` }}
                     >
@@ -341,13 +339,13 @@ export function ProductMockup() {
                 </ul>
               )}
 
-              {/* Phase 6: Bullets done, advance to code */}
-              {phase === 5 && (
+              {/* Phase 5: Bullets done, advance to spreadsheet */}
+              {phase === 4 && (
                 <div className="hidden">
                   <TypeWriter text="" delay={600} onComplete={advancePhase} />
                 </div>
               )}
-              {phase === 6 && (
+              {phase === 5 && (
                 <div className="hidden">
                   <TypeWriter text="" delay={300} onComplete={advancePhase} />
                 </div>
@@ -374,7 +372,7 @@ export function ProductMockup() {
           </div>
         </div>
 
-        {/* Right panel - code/diff view */}
+        {/* Right panel - spreadsheet view */}
         <div className="hidden lg:block w-80 border-l border-border-01 bg-bg">
           {/* Tabs */}
           <div className="flex border-b border-border-01">
@@ -382,17 +380,32 @@ export function ProductMockup() {
             <div className="px-4 py-2 text-xs text-text-tertiary">sources.pdf</div>
           </div>
 
-          {/* Code content */}
-          <div className="p-4 font-mono text-xs">
-            {CONTENT.codeLines.map((line, i) => (
-              <CodeLine
-                key={i}
-                num={line.num}
-                content={line.content}
-                added={line.added}
-                visible={i < visibleCodeLines}
-              />
-            ))}
+          {/* Spreadsheet content */}
+          <div className="p-3">
+            <table className="w-full text-xs font-mono">
+              <thead>
+                <tr className="border-b border-border-01">
+                  <th className="w-6 py-1 text-text-tertiary"></th>
+                  <th className="py-1 px-2 text-left text-text-tertiary font-normal">A</th>
+                  <th className="py-1 px-2 text-left text-text-tertiary font-normal">B</th>
+                  <th className="py-1 px-2 text-left text-text-tertiary font-normal">C</th>
+                  <th className="py-1 px-2 text-left text-text-tertiary font-normal">D</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CONTENT.spreadsheet.map((row, i) => (
+                  <SpreadsheetRow
+                    key={i}
+                    rowNum={row.row}
+                    cells={row.cells}
+                    isHeader={row.isHeader}
+                    isNew={row.isNew}
+                    isTotal={row.isTotal}
+                    visible={i < visibleRows}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

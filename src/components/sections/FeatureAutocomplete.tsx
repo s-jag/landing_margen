@@ -66,10 +66,10 @@ export function FeatureAutocomplete() {
           {/* Text - RIGHT side */}
           <div className="max-w-md order-1 md:order-2">
             <h2 className="text-lg md:text-xl text-text mb-v0.5">
-              Magically accurate form completion
+              Audit-ready form completion
             </h2>
             <p className="text-base text-text-secondary mb-v1">
-              Our custom model predicts your next entry with striking speed and precision.
+              Our custom model predicts your next entry with traceable accuracy and precision.
             </p>
             <Link href="/autocomplete" className="link-accent inline-flex items-center gap-1">
               Learn about Tab

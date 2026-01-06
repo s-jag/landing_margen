@@ -205,6 +205,27 @@
     background-color: rgba(237, 236, 236, 0.9);
   }
 
+  /* Button - accent (orange bg, dark text) */
+  .btn-accent {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: 0.89em 1.45em 0.91em;
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--color-bg);
+    background-color: var(--color-accent);
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: background-color var(--duration) var(--ease);
+  }
+  .btn-accent:hover {
+    background-color: var(--color-accent-hover);
+  }
+
   /* Button - secondary (border only) */
   .btn-secondary {
     display: inline-flex;
@@ -449,4 +470,9 @@
 
 .field-waiting {
   animation: field-pulse 2s ease-in-out infinite;
+}
+
+/* Margen brand highlight - accent color */
+.margen-highlight {
+  color: var(--color-accent);
 }
