@@ -44,8 +44,8 @@ export function Header() {
             >
               Sign in
             </Link>
-            <Link href="/download" className="btn">
-              Download
+            <Link href="/chat" className="btn">
+              Try for Free
             </Link>
           </div>
 

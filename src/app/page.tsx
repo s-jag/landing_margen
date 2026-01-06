@@ -1,9 +1,9 @@
 import { Header, Footer } from '@/components/layout';
 import {
   Hero,
-  LogoGarden,
   FeatureAgent,
   FeatureAutocomplete,
+  Ecosystem,
   Frontier,
 } from '@/components/sections';
 
@@ -13,9 +13,9 @@ export default function Home() {
       <Header />
       <main id="main-content">
         <Hero />
-        <LogoGarden />
         <FeatureAgent />
         <FeatureAutocomplete />
+        <Ecosystem />
         <Frontier />
       </main>
       <Footer />

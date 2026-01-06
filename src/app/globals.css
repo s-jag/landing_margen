@@ -315,4 +315,138 @@
 
   /* Left align - DEFAULT, not centered */
   .text-left { text-align: left; }
+
+  /* Blinking cursor - the heartbeat of the AI */
+  .typing-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background-color: var(--color-accent);
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    animation: cursor-blink 1s step-end infinite;
+  }
+
+  /* Spinning loader for "Generating" items */
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+}
+
+/* Keyframe animations */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Frontier card hover - lift and glow */
+.frontier-card {
+  transition: transform var(--duration-slow) var(--ease),
+              box-shadow var(--duration-slow) var(--ease),
+              border-color var(--duration-slow) var(--ease);
+}
+
+.frontier-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  border-color: rgba(237, 236, 236, 0.06);
+}
+
+/* Search pulse - the invitation to type */
+@keyframes search-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px var(--color-border-01);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px var(--color-border-02),
+                0 0 0 4px rgba(245, 78, 0, 0.08);
+  }
+}
+
+.search-pulse {
+  animation: search-pulse 3s ease-in-out infinite;
+}
+
+/* ============================================
+   MAGIC FORM ANIMATIONS
+   ============================================ */
+
+/* Row glow - data arriving */
+@keyframes row-glow {
+  0% {
+    background-color: transparent;
+  }
+  30% {
+    background-color: rgba(245, 78, 0, 0.05);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.row-glow {
+  animation: row-glow 0.6s ease-out;
+}
+
+.row-glow-hero {
+  animation: row-glow-hero 0.8s ease-out;
+}
+
+@keyframes row-glow-hero {
+  0% {
+    background-color: transparent;
+  }
+  30% {
+    background-color: rgba(245, 78, 0, 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Shimmer across text - the magic */
+@keyframes shimmer {
+  0% { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--color-text) 0%,
+    var(--color-text) 40%,
+    var(--color-accent) 50%,
+    var(--color-text) 60%,
+    var(--color-text) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 0.6s ease-out forwards;
+}
+
+/* Ghost text fade in - Tab completion */
+.ghost-fade {
+  opacity: 0;
+  animation: ghost-appear 0.3s ease-out forwards;
+}
+
+@keyframes ghost-appear {
+  to { opacity: 1; }
+}
+
+/* Waiting field pulse - inviting input */
+@keyframes field-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.field-waiting {
+  animation: field-pulse 2s ease-in-out infinite;
 }
