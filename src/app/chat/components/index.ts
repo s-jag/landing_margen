@@ -1,6 +1,9 @@
 export { ChatInput } from './ChatInput';
 export { ClientSelector } from './ClientSelector';
 export { ComparisonCard } from './ComparisonCard';
+export { DocumentUpload } from './DocumentUpload';
+export { DocumentViewer } from './DocumentViewer';
 export { MessageList } from './MessageList';
+export { Modal } from './Modal';
 export { ThreadList } from './ThreadList';
 export { TypingIndicator } from './TypingIndicator';

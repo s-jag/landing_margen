@@ -8,7 +8,7 @@ export function Ecosystem() {
           {/* Text - LEFT side */}
           <div className="max-w-md">
             <h2 className="text-lg md:text-xl text-text mb-v0.5">
-              Everywhere tax work gets done
+              Tax work gets done; Everywhere and all the time.
             </h2>
             <p className="text-base text-text-secondary mb-v1">
               Margen is in your inbox responding to clients, analyzing documents in your portal, and anywhere else you work.

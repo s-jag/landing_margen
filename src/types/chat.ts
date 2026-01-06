@@ -19,7 +19,10 @@ export interface Document {
   id: string;
   name: string;
   type: 'W2' | '1099' | 'Receipt' | 'Prior Return' | 'Other';
+  uploadedAt?: string;
 }
+
+export type DocumentType = Document['type'];
 
 export interface ChatThread {
   id: string;
@@ -99,6 +102,10 @@ export interface ChatState {
 
   // Dropdown states
   clientDropdownOpen: boolean;
+
+  // Document modal states
+  viewingDocument: Document | null;
+  uploadModalOpen: boolean;
 }
 
 export type ChatAction =
@@ -111,4 +118,7 @@ export type ChatAction =
   | { type: 'SET_IS_LOADING'; payload: boolean }
   | { type: 'SET_IS_TYPING'; payload: boolean }
   | { type: 'LOAD_PERSISTED_STATE'; payload: Partial<ChatState> }
-  | { type: 'UPDATE_THREAD_TIMESTAMP'; payload: { threadId: string; timestamp: string } };
+  | { type: 'UPDATE_THREAD_TIMESTAMP'; payload: { threadId: string; timestamp: string } }
+  | { type: 'SET_VIEWING_DOCUMENT'; payload: Document | null }
+  | { type: 'SET_UPLOAD_MODAL_OPEN'; payload: boolean }
+  | { type: 'ADD_DOCUMENT'; payload: { clientId: string; document: Document } };

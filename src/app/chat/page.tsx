@@ -3,14 +3,21 @@
 import Link from 'next/link';
 import { ChatProvider, useChat } from '@/context/ChatContext';
 import { getStateBadgeColor, formatCurrency, getDocIcon } from '@/lib/chatUtils';
-import { ClientSelector, ThreadList, MessageList, ChatInput } from './components';
+import {
+  ClientSelector,
+  ThreadList,
+  MessageList,
+  ChatInput,
+  DocumentViewer,
+  DocumentUpload,
+} from './components';
 
 // =============================================================================
 // RIGHT SIDEBAR - Client Context Panel
 // =============================================================================
 
 function RightSidebar() {
-  const { selectedClient } = useChat();
+  const { selectedClient, openDocumentViewer, openUploadModal } = useChat();
 
   return (
     <aside className="w-72 border-l border-border-01 bg-card flex flex-col flex-shrink-0 overflow-y-auto">
@@ -67,6 +74,7 @@ function RightSidebar() {
           </div>
           <button
             type="button"
+            onClick={openUploadModal}
             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 border border-accent/30 rounded-md transition-colors min-h-[32px]"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -84,9 +92,11 @@ function RightSidebar() {
           {selectedClient.documents.map((doc) => {
             const iconInfo = getDocIcon(doc.name);
             return (
-              <div
+              <button
                 key={doc.id}
-                className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-card-02 cursor-pointer transition-colors group"
+                type="button"
+                onClick={() => openDocumentViewer(doc)}
+                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-card-02 cursor-pointer transition-colors group text-left"
               >
                 <span
                   className={`text-xs font-medium px-1.5 py-0.5 rounded ${iconInfo.color} ${iconInfo.bg}`}
@@ -96,7 +106,7 @@ function RightSidebar() {
                 <span className="text-sm text-text-secondary group-hover:text-text truncate transition-colors">
                   {doc.name}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -111,42 +121,48 @@ function RightSidebar() {
 
 function ChatContent() {
   return (
-    <div className="h-screen bg-bg flex flex-col">
-      {/* Minimal Header */}
-      <header className="h-12 border-b border-border-01 flex items-center justify-between px-4 flex-shrink-0">
-        <Link href="/" className="flex items-center gap-2">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M2 4h3l5 8 5-8h3v12h-3V8l-5 8-5-8v8H2V4z"
-              fill="currentColor"
-              className="text-text"
-            />
-          </svg>
-          <span className="text-sm font-medium text-text">Margen</span>
-        </Link>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-text-secondary">Research Assistant</span>
+    <>
+      <div className="h-screen bg-bg flex flex-col">
+        {/* Minimal Header */}
+        <header className="h-12 border-b border-border-01 flex items-center justify-between px-4 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M2 4h3l5 8 5-8h3v12h-3V8l-5 8-5-8v8H2V4z"
+                fill="currentColor"
+                className="text-text"
+              />
+            </svg>
+            <span className="text-sm font-medium text-text">Margen</span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-text-secondary">Research Assistant</span>
+          </div>
+        </header>
+
+        {/* Three-Panel Layout */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar - Clients & Chats */}
+          <aside className="w-60 border-r border-border-01 bg-card flex flex-col flex-shrink-0">
+            <ClientSelector />
+            <ThreadList />
+          </aside>
+
+          {/* Center - Chat Area */}
+          <main className="flex-1 flex flex-col bg-bg overflow-hidden">
+            <MessageList />
+            <ChatInput />
+          </main>
+
+          {/* Right Panel - Context */}
+          <RightSidebar />
         </div>
-      </header>
-
-      {/* Three-Panel Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Clients & Chats */}
-        <aside className="w-60 border-r border-border-01 bg-card flex flex-col flex-shrink-0">
-          <ClientSelector />
-          <ThreadList />
-        </aside>
-
-        {/* Center - Chat Area */}
-        <main className="flex-1 flex flex-col bg-bg overflow-hidden">
-          <MessageList />
-          <ChatInput />
-        </main>
-
-        {/* Right Panel - Context */}
-        <RightSidebar />
       </div>
-    </div>
+
+      {/* Modals */}
+      <DocumentViewer />
+      <DocumentUpload />
+    </>
   );
 }
 

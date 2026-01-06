@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import type { ChatState, ChatAction, Client, ChatThread, Message } from '@/types/chat';
+import type { ChatState, ChatAction, Client, ChatThread, Message, Document, DocumentType } from '@/types/chat';
 import { chatService } from '@/services/chatService';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import {
@@ -19,6 +19,7 @@ import {
   createNewThread,
   generateThreadTitleFromMessage,
   getRelativeTimestamp,
+  createDocument,
 } from '@/lib/chatUtils';
 
 // =============================================================================
@@ -35,6 +36,8 @@ const initialState: ChatState = {
   isLoading: false,
   isTyping: false,
   clientDropdownOpen: false,
+  viewingDocument: null,
+  uploadModalOpen: false,
 };
 
 // =============================================================================
@@ -118,6 +121,31 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...action.payload,
       };
 
+    case 'SET_VIEWING_DOCUMENT':
+      return {
+        ...state,
+        viewingDocument: action.payload,
+      };
+
+    case 'SET_UPLOAD_MODAL_OPEN':
+      return {
+        ...state,
+        uploadModalOpen: action.payload,
+      };
+
+    case 'ADD_DOCUMENT': {
+      const { clientId, document } = action.payload;
+      return {
+        ...state,
+        clients: state.clients.map((client) =>
+          client.id === clientId
+            ? { ...client, documents: [...client.documents, document] }
+            : client
+        ),
+        uploadModalOpen: false,
+      };
+    }
+
     default:
       return state;
   }
@@ -140,6 +168,13 @@ interface ChatContextValue extends ChatState {
   createThread: () => void;
   sendMessage: (content: string) => Promise<void>;
   setInputValue: (value: string) => void;
+
+  // Document actions
+  openDocumentViewer: (document: Document) => void;
+  closeDocumentViewer: () => void;
+  openUploadModal: () => void;
+  closeUploadModal: () => void;
+  addDocument: (name: string, type: DocumentType) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -160,6 +195,7 @@ interface PersistedState {
   messagesByThread: Record<string, Message[]>;
   selectedClientId: string;
   activeThreadId: string | null;
+  clients: Client[];
 }
 
 export function ChatProvider({ children }: ChatProviderProps) {
@@ -181,6 +217,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
           messagesByThread: persistedState.messagesByThread,
           selectedClientId: persistedState.selectedClientId,
           activeThreadId: persistedState.activeThreadId,
+          clients: persistedState.clients || MOCK_CLIENTS,
         },
       });
     }
@@ -195,8 +232,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
       messagesByThread: state.messagesByThread,
       selectedClientId: state.selectedClientId,
       activeThreadId: state.activeThreadId,
+      clients: state.clients,
     });
-  }, [state.threads, state.messagesByThread, state.selectedClientId, state.activeThreadId, setPersistedState]);
+  }, [state.threads, state.messagesByThread, state.selectedClientId, state.activeThreadId, state.clients, setPersistedState]);
 
   // =============================================================================
   // DERIVED STATE
@@ -332,6 +370,37 @@ export function ChatProvider({ children }: ChatProviderProps) {
   );
 
   // =============================================================================
+  // DOCUMENT ACTIONS
+  // =============================================================================
+
+  const openDocumentViewer = useCallback((document: Document) => {
+    dispatch({ type: 'SET_VIEWING_DOCUMENT', payload: document });
+  }, []);
+
+  const closeDocumentViewer = useCallback(() => {
+    dispatch({ type: 'SET_VIEWING_DOCUMENT', payload: null });
+  }, []);
+
+  const openUploadModal = useCallback(() => {
+    dispatch({ type: 'SET_UPLOAD_MODAL_OPEN', payload: true });
+  }, []);
+
+  const closeUploadModal = useCallback(() => {
+    dispatch({ type: 'SET_UPLOAD_MODAL_OPEN', payload: false });
+  }, []);
+
+  const addDocument = useCallback(
+    (name: string, type: DocumentType) => {
+      const document = createDocument(name, type);
+      dispatch({
+        type: 'ADD_DOCUMENT',
+        payload: { clientId: state.selectedClientId, document },
+      });
+    },
+    [state.selectedClientId]
+  );
+
+  // =============================================================================
   // CONTEXT VALUE
   // =============================================================================
 
@@ -346,6 +415,11 @@ export function ChatProvider({ children }: ChatProviderProps) {
     createThread,
     sendMessage,
     setInputValue,
+    openDocumentViewer,
+    closeDocumentViewer,
+    openUploadModal,
+    closeUploadModal,
+    addDocument,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

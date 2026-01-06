@@ -1,4 +1,4 @@
-import type { Client, ChatThread, Message } from '@/types/chat';
+import type { Client, ChatThread, Message, Document, DocumentType } from '@/types/chat';
 
 // =============================================================================
 // FORMATTING UTILITIES
@@ -59,6 +59,10 @@ export function generateMessageId(): string {
   return generateId('msg');
 }
 
+export function generateDocumentId(): string {
+  return generateId('doc');
+}
+
 // =============================================================================
 // TIMESTAMP UTILITIES
 // =============================================================================
@@ -117,6 +121,42 @@ export function createUserMessage(content: string): Message {
     content,
     timestamp: getCurrentTimestamp(),
   };
+}
+
+// =============================================================================
+// DOCUMENT UTILITIES
+// =============================================================================
+
+export const DOCUMENT_TYPES: DocumentType[] = [
+  'W2',
+  '1099',
+  'Receipt',
+  'Prior Return',
+  'Other',
+];
+
+export function createDocument(name: string, type: DocumentType): Document {
+  return {
+    id: generateDocumentId(),
+    name,
+    type,
+    uploadedAt: new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+  };
+}
+
+export function getDocumentTypeLabel(type: DocumentType): string {
+  const labels: Record<DocumentType, string> = {
+    'W2': 'W-2 Form',
+    '1099': '1099 Form',
+    'Receipt': 'Receipt',
+    'Prior Return': 'Prior Year Return',
+    'Other': 'Other Document',
+  };
+  return labels[type];
 }
 
 // =============================================================================
