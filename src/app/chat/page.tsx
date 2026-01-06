@@ -42,6 +42,14 @@ interface Message {
     source: string;
     excerpt: string;
   };
+  comparison?: {
+    options: {
+      title: string;
+      formula: string;
+      result: string;
+      recommended?: boolean;
+    }[];
+  };
 }
 
 // =============================================================================
@@ -62,7 +70,7 @@ const MOCK_CLIENTS: Client[] = [
     documents: [
       { id: 'd1', name: 'W-2 Employer Inc.', type: 'W2' },
       { id: 'd2', name: '1099-NEC Consulting', type: '1099' },
-      { id: 'd3', name: 'Schedule C (Draft)', type: 'Other' },
+      { id: 'd3', name: 'Schedule C (Draft).pdf', type: 'Other' },
       { id: 'd4', name: 'Home Office Calc.xlsx', type: 'Other' },
     ],
   },
@@ -78,7 +86,7 @@ const MOCK_CLIENTS: Client[] = [
     dependents: 0,
     documents: [
       { id: 'd5', name: 'W-2 Tech Corp', type: 'W2' },
-      { id: 'd6', name: '1099-INT Bank', type: '1099' },
+      { id: 'd6', name: '1099-INT Bank.pdf', type: '1099' },
     ],
   },
   {
@@ -94,13 +102,13 @@ const MOCK_CLIENTS: Client[] = [
     documents: [
       { id: 'd7', name: 'W-2 Corp Executive', type: 'W2' },
       { id: 'd8', name: '1099-NEC Board Fees', type: '1099' },
-      { id: 'd9', name: 'K-1 Partnership', type: 'Other' },
+      { id: 'd9', name: 'K-1 Partnership.pdf', type: 'Other' },
     ],
   },
 ];
 
 const MOCK_CHAT_THREADS: ChatThread[] = [
-  { id: 't1', title: 'Home office deduction analysis', timestamp: '2 min ago', active: true },
+  { id: 't1', title: 'Home office deduction analysis', timestamp: 'Active', active: true },
   { id: 't2', title: 'QBI limitation for Schedule C', timestamp: 'Yesterday' },
   { id: 't3', title: 'Vehicle depreciation 179 vs MACRS', timestamp: 'Jan 3' },
 ];
@@ -117,16 +125,26 @@ const MOCK_MESSAGES: Message[] = [
     role: 'assistant',
     content: `Based on John's Schedule C income of $42,300, he qualifies for the home office deduction under IRC §280A. Since he uses the space regularly and exclusively for business, he meets the basic requirements.
 
-**Two calculation methods available:**
-
-• **Simplified Method** (Rev. Proc. 2013-13): 300 sq ft × $5 = **$1,500**
-• **Regular Method**: Actual expenses × 15% (300/2,000 sq ft)
-
 The simplified method caps at 300 sq ft, so John gets the maximum benefit. I recommend the simplified method for ease of documentation and audit defense.`,
     timestamp: '2:34 PM',
     citation: {
       source: 'IRC Section 280A(c)(1)',
       excerpt: 'A portion of the dwelling unit which is exclusively used on a regular basis as the principal place of business for any trade or business of the taxpayer...',
+    },
+    comparison: {
+      options: [
+        {
+          title: 'Simplified Method',
+          formula: '300 sq ft × $5',
+          result: '$1,500',
+          recommended: true,
+        },
+        {
+          title: 'Regular Method',
+          formula: 'Actual expenses × 15%',
+          result: 'Varies',
+        },
+      ],
     },
   },
 ];
@@ -136,9 +154,7 @@ The simplified method caps at 300 sq ft, so John gets the maximum benefit. I rec
 // =============================================================================
 
 function getStateBadgeColor(state: string): string {
-  // No state income tax states
   const noTaxStates = ['FL', 'TX', 'NV', 'WA', 'WY', 'SD', 'AK', 'TN', 'NH'];
-  // High tax states
   const highTaxStates = ['CA', 'NY', 'NJ', 'OR', 'MN'];
 
   if (noTaxStates.includes(state)) {
@@ -157,6 +173,55 @@ function formatCurrency(amount: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function getDocIcon(name: string): { color: string; bg: string; label: string } {
+  const lowerName = name.toLowerCase();
+  if (lowerName.endsWith('.pdf')) {
+    return { color: 'text-red-400', bg: 'bg-red-400/10', label: 'PDF' };
+  }
+  if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
+    return { color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: 'XLS' };
+  }
+  if (lowerName.includes('w-2') || lowerName.includes('w2')) {
+    return { color: 'text-blue-400', bg: 'bg-blue-400/10', label: 'W2' };
+  }
+  if (lowerName.includes('1099')) {
+    return { color: 'text-purple-400', bg: 'bg-purple-400/10', label: '1099' };
+  }
+  return { color: 'text-text-secondary', bg: 'bg-card-03', label: 'DOC' };
+}
+
+// =============================================================================
+// COMPARISON CARD COMPONENT
+// =============================================================================
+
+function ComparisonCard({ options }: { options: NonNullable<Message['comparison']>['options'] }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 my-4">
+      {options.map((option, i) => (
+        <div
+          key={i}
+          className={`p-4 rounded-lg border ${
+            option.recommended
+              ? 'bg-accent/5 border-accent/30'
+              : 'bg-card border-border-01'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
+              {option.title}
+            </span>
+            {option.recommended && (
+              <span className="text-xs text-accent font-medium">Recommended</span>
+            )}
+          </div>
+          <div className="text-sm text-text-secondary mb-1">{option.formula}</div>
+          <div className="text-lg font-medium text-text">{option.result}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // =============================================================================
@@ -185,7 +250,7 @@ export default function ChatPage() {
           <span className="text-sm font-medium text-text">Margen</span>
         </Link>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-text-tertiary">Research Assistant</span>
+          <span className="text-xs text-text-secondary">Research Assistant</span>
         </div>
       </header>
 
@@ -198,17 +263,17 @@ export default function ChatPage() {
             <div className="relative">
               <button
                 onClick={() => setClientDropdownOpen(!clientDropdownOpen)}
-                className="w-full text-left bg-card-02 rounded-md p-3 border border-border-01 hover:border-border-02 transition-colors"
+                className="w-full text-left bg-card-02 rounded-md p-3 border border-border-02 hover:border-border-03 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-medium text-text">{selectedClient.name}</div>
-                    <div className="text-xs text-text-tertiary mt-0.5">
+                    <div className="text-xs text-text-secondary mt-0.5">
                       {selectedClient.state} · {selectedClient.taxYear} · {selectedClient.filingStatus}
                     </div>
                   </div>
                   <svg
-                    className={`w-4 h-4 text-text-tertiary transition-transform ${clientDropdownOpen ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 text-text-secondary transition-transform ${clientDropdownOpen ? 'rotate-180' : ''}`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -233,7 +298,7 @@ export default function ChatPage() {
                       }`}
                     >
                       <div className="text-sm text-text">{client.name}</div>
-                      <div className="text-xs text-text-tertiary">
+                      <div className="text-xs text-text-secondary">
                         {client.state} · {client.filingStatus}
                       </div>
                     </button>
@@ -245,7 +310,7 @@ export default function ChatPage() {
 
           {/* New Chat Button */}
           <div className="p-3">
-            <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-card-02 border border-border-01 rounded-md text-sm text-text-secondary hover:text-text hover:border-border-02 transition-colors">
+            <button className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-card-02 border border-border-02 rounded-md text-sm text-text-secondary hover:text-text hover:bg-card-03 transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -256,25 +321,24 @@ export default function ChatPage() {
           {/* Chat History */}
           <div className="flex-1 overflow-y-auto">
             <div className="px-3 py-2">
-              <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Recent Chats</div>
+              <div className="text-xs text-text-secondary uppercase tracking-wider mb-2">Recent Chats</div>
               {MOCK_CHAT_THREADS.map((thread) => (
                 <div
                   key={thread.id}
-                  className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                    thread.active ? 'bg-card-03' : 'hover:bg-card-02'
+                  className={`px-3 py-2.5 rounded-md cursor-pointer transition-colors mb-1 ${
+                    thread.active
+                      ? 'bg-white/[0.06] border-l-2 border-accent -ml-[2px] pl-[14px]'
+                      : 'hover:bg-card-02'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        thread.active ? 'bg-accent' : 'bg-text-tertiary'
-                      }`}
-                    />
-                    <span className={`text-sm truncate ${thread.active ? 'text-text' : 'text-text-secondary'}`}>
+                    <span className={`text-sm truncate ${thread.active ? 'text-text font-medium' : 'text-text-secondary'}`}>
                       {thread.title}
                     </span>
                   </div>
-                  <div className="text-xs text-text-tertiary mt-0.5 ml-3.5">{thread.timestamp}</div>
+                  {!thread.active && (
+                    <div className="text-xs text-text-tertiary mt-0.5">{thread.timestamp}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -285,11 +349,11 @@ export default function ChatPage() {
         <main className="flex-1 flex flex-col bg-bg overflow-hidden">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-3xl mx-auto space-y-6">
+            <div className="max-w-[680px] mx-auto space-y-8">
               {MOCK_MESSAGES.map((message) => (
                 <div key={message.id} className="group">
                   {/* Message Header */}
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-3">
                     <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
                       {message.role === 'user' ? 'You' : 'Margen'}
                     </span>
@@ -299,21 +363,29 @@ export default function ChatPage() {
                   {/* Message Content */}
                   <div className={`text-sm leading-relaxed ${message.role === 'user' ? 'text-text-secondary' : 'text-text'}`}>
                     {message.content.split('\n').map((line, i) => (
-                      <p key={i} className={line.startsWith('•') ? 'ml-4' : line.startsWith('**') ? 'font-medium mt-3' : 'mt-2'}>
+                      <p key={i} className={i > 0 ? 'mt-3' : ''}>
                         {line}
                       </p>
                     ))}
                   </div>
 
+                  {/* Comparison Cards */}
+                  {message.comparison && (
+                    <ComparisonCard options={message.comparison.options} />
+                  )}
+
                   {/* Citation Card */}
                   {message.citation && (
-                    <div className="mt-4 bg-card border border-border-01 rounded-md overflow-hidden">
-                      <div className="border-l-2 border-accent p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs text-text-tertiary">Source</span>
+                    <div className="mt-4 bg-card border border-border-01 rounded-lg overflow-hidden">
+                      <div className="border-l-2 border-accent p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span className="text-xs text-text-secondary font-medium">Source</span>
                         </div>
                         <div className="text-sm font-medium text-text">{message.citation.source}</div>
-                        <div className="text-xs text-text-secondary mt-1 italic">
+                        <div className="text-sm text-text-secondary mt-2 italic leading-relaxed">
                           "{message.citation.excerpt}"
                         </div>
                       </div>
@@ -324,33 +396,33 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Input Area */}
-          <div className="border-t border-border-01 p-4 bg-card">
-            <div className="max-w-3xl mx-auto">
-              <div className="bg-card-02 border border-border-01 rounded-lg p-3 focus-within:border-border-02 transition-colors">
+          {/* Input Area - GROUNDED */}
+          <div className="border-t border-border-02 p-4 bg-card">
+            <div className="max-w-[680px] mx-auto">
+              <div className="bg-card-02 border border-border-02 rounded-lg overflow-hidden focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/20 transition-all">
                 <textarea
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={`Ask about ${selectedClient.name}'s tax situation...`}
-                  className="w-full bg-transparent text-sm text-text placeholder:text-text-tertiary resize-none outline-none"
+                  className="w-full bg-transparent text-sm text-text placeholder:text-text-tertiary resize-none outline-none p-4"
                   rows={2}
                 />
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-01">
+                <div className="flex items-center justify-between px-4 py-3 bg-card-03/50 border-t border-border-01">
                   <div className="flex items-center gap-2">
-                    <button className="flex items-center gap-1.5 px-2 py-1 text-xs text-text-secondary hover:text-text rounded transition-colors">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                       </svg>
                       Attach
                     </button>
-                    <div className="flex items-center gap-1 px-2 py-1 text-xs text-text-tertiary bg-card-03 rounded">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
                       <span>Claude Sonnet 4</span>
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
-                    </div>
+                    </button>
                   </div>
-                  <button className="px-4 py-1.5 bg-accent text-bg text-sm font-medium rounded-full hover:bg-accent/80 transition-colors">
+                  <button className="px-5 py-2 bg-accent text-bg text-sm font-medium rounded-full hover:bg-accent/90 transition-colors">
                     Send
                   </button>
                 </div>
@@ -361,16 +433,15 @@ export default function ChatPage() {
 
         {/* Right Panel - Context */}
         <aside className="w-72 border-l border-border-01 bg-card flex flex-col flex-shrink-0 overflow-y-auto">
-          {/* Client Info Card */}
+          {/* Client Info Card - Compact, no redundant name */}
           <div className="p-4 border-b border-border-01">
-            <div className="text-lg font-medium text-text">{selectedClient.name}</div>
-            <div className="text-xs text-text-tertiary mt-0.5">SSN: {selectedClient.ssn}</div>
+            <div className="text-xs text-text-secondary mb-3">SSN: {selectedClient.ssn}</div>
 
-            <div className="flex items-center gap-2 mt-3">
-              <span className={`px-2 py-1 text-xs font-medium rounded border ${getStateBadgeColor(selectedClient.state)}`}>
+            <div className="flex items-center gap-2">
+              <span className={`px-2.5 py-1 text-xs font-medium rounded border ${getStateBadgeColor(selectedClient.state)}`}>
                 {selectedClient.state}
               </span>
-              <span className="px-2 py-1 text-xs text-text-secondary bg-card-03 rounded">
+              <span className="px-2.5 py-1 text-xs text-text-secondary bg-card-03 rounded border border-border-01">
                 {selectedClient.filingStatus} · {selectedClient.taxYear}
               </span>
             </div>
@@ -378,16 +449,16 @@ export default function ChatPage() {
 
           {/* Quick Facts */}
           <div className="p-4 border-b border-border-01">
-            <div className="text-xs text-text-tertiary uppercase tracking-wider mb-3">Quick Facts</div>
-            <div className="space-y-2">
+            <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">Quick Facts</div>
+            <div className="space-y-2.5">
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Gross Income</span>
-                <span className="text-text font-medium">{formatCurrency(selectedClient.grossIncome)}</span>
+                <span className="text-text font-medium tabular-nums">{formatCurrency(selectedClient.grossIncome)}</span>
               </div>
               {selectedClient.schedCRevenue > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Sched C Revenue</span>
-                  <span className="text-text font-medium">{formatCurrency(selectedClient.schedCRevenue)}</span>
+                  <span className="text-text font-medium tabular-nums">{formatCurrency(selectedClient.schedCRevenue)}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
@@ -400,23 +471,33 @@ export default function ChatPage() {
           {/* Documents */}
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-xs text-text-tertiary uppercase tracking-wider">
+              <div className="text-xs text-text-secondary uppercase tracking-wider">
                 Documents ({selectedClient.documents.length})
               </div>
-              <button className="text-xs text-accent hover:text-accent/80 transition-colors">+ Add</button>
+              <button className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 border border-accent/30 rounded-md transition-colors min-h-[32px]">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add
+              </button>
             </div>
             <div className="space-y-1">
-              {selectedClient.documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-card-02 cursor-pointer transition-colors"
-                >
-                  <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <span className="text-sm text-text-secondary truncate">{doc.name}</span>
-                </div>
-              ))}
+              {selectedClient.documents.map((doc) => {
+                const iconInfo = getDocIcon(doc.name);
+                return (
+                  <div
+                    key={doc.id}
+                    className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-card-02 cursor-pointer transition-colors group"
+                  >
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${iconInfo.color} ${iconInfo.bg}`}>
+                      {iconInfo.label}
+                    </span>
+                    <span className="text-sm text-text-secondary group-hover:text-text truncate transition-colors">
+                      {doc.name}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </aside>
