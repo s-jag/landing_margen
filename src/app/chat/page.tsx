@@ -205,7 +205,7 @@ function ComparisonCard({ options }: { options: NonNullable<Message['comparison'
           className={`p-4 rounded-md border ${
             option.recommended
               ? 'bg-accent/5 border-accent/30'
-              : 'bg-card-02 border-border-02'
+              : 'bg-card-03 border-border-03'
           }`}
         >
           <div className="flex items-center justify-between mb-2">
@@ -329,7 +329,7 @@ export default function ChatPage() {
                   key={thread.id}
                   className={`px-3 py-2.5 rounded-md cursor-pointer transition-colors mb-1 ${
                     thread.active
-                      ? 'bg-white/[0.06] border-l-2 border-accent -ml-[2px] pl-[14px]'
+                      ? 'bg-accent/10'
                       : 'hover:bg-card-02'
                   }`}
                 >
@@ -399,17 +399,17 @@ export default function ChatPage() {
           </div>
 
           {/* Input Area - GROUNDED */}
-          <div className="border-t border-border-02 p-3 bg-card">
+          <div className="border-t border-border-02 p-2 bg-card">
             <div className="max-w-[680px] mx-auto">
               <div className="bg-card-02 border border-border-02 rounded-md overflow-hidden focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/20 transition-all">
                 <textarea
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={`Ask about ${selectedClient.name}'s tax situation...`}
-                  className="w-full bg-white/[0.02] text-sm text-text placeholder:text-text-tertiary resize-none outline-none px-4 py-3"
-                  rows={2}
+                  className="w-full bg-white/[0.02] text-sm text-text placeholder:text-text-tertiary resize-none outline-none px-4 py-2"
+                  rows={1}
                 />
-                <div className="flex items-center justify-between px-3 py-2 bg-card-03/50 border-t border-border-01">
+                <div className="flex items-center justify-between px-3 py-2 bg-card-03/50">
                   <div className="flex items-center gap-2">
                     <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -352,6 +352,12 @@
   .spin {
     animation: spin 1s linear infinite;
   }
+
+  /* Tabular figures for financial data - ensures $ signs and digits align */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
 }
 
 /* Keyframe animations */
