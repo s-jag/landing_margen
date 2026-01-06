@@ -178,18 +178,18 @@ function formatCurrency(amount: number): string {
 function getDocIcon(name: string): { color: string; bg: string; label: string } {
   const lowerName = name.toLowerCase();
   if (lowerName.endsWith('.pdf')) {
-    return { color: 'text-red-400', bg: 'bg-red-400/10', label: 'PDF' };
+    return { color: 'text-rose-300/80', bg: 'bg-rose-500/[0.08]', label: 'PDF' };
   }
   if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
-    return { color: 'text-emerald-400', bg: 'bg-emerald-400/10', label: 'XLS' };
+    return { color: 'text-emerald-300/80', bg: 'bg-emerald-500/[0.08]', label: 'XLS' };
   }
   if (lowerName.includes('w-2') || lowerName.includes('w2')) {
-    return { color: 'text-blue-400', bg: 'bg-blue-400/10', label: 'W2' };
+    return { color: 'text-sky-300/80', bg: 'bg-sky-500/[0.08]', label: 'W2' };
   }
   if (lowerName.includes('1099')) {
-    return { color: 'text-purple-400', bg: 'bg-purple-400/10', label: '1099' };
+    return { color: 'text-violet-300/80', bg: 'bg-violet-500/[0.08]', label: '1099' };
   }
-  return { color: 'text-text-secondary', bg: 'bg-card-03', label: 'DOC' };
+  return { color: 'text-text-tertiary', bg: 'bg-card-03', label: 'DOC' };
 }
 
 // =============================================================================
@@ -202,10 +202,10 @@ function ComparisonCard({ options }: { options: NonNullable<Message['comparison'
       {options.map((option, i) => (
         <div
           key={i}
-          className={`p-4 rounded-lg border ${
+          className={`p-4 rounded-md border ${
             option.recommended
               ? 'bg-accent/5 border-accent/30'
-              : 'bg-card border-border-01'
+              : 'bg-card-02 border-border-02'
           }`}
         >
           <div className="flex items-center justify-between mb-2">
@@ -213,7 +213,9 @@ function ComparisonCard({ options }: { options: NonNullable<Message['comparison'
               {option.title}
             </span>
             {option.recommended && (
-              <span className="text-xs text-accent font-medium">Recommended</span>
+              <span className="px-2 py-0.5 text-xs font-medium bg-emerald-500/15 text-emerald-400 rounded">
+                Recommended
+              </span>
             )}
           </div>
           <div className="text-sm text-text-secondary mb-1">{option.formula}</div>
@@ -273,7 +275,7 @@ export default function ChatPage() {
                     </div>
                   </div>
                   <svg
-                    className={`w-4 h-4 text-text-secondary transition-transform ${clientDropdownOpen ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 text-text-secondary ml-3 flex-shrink-0 transition-transform ${clientDropdownOpen ? 'rotate-180' : ''}`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -348,7 +350,7 @@ export default function ChatPage() {
         {/* Center - Chat Area */}
         <main className="flex-1 flex flex-col bg-bg overflow-hidden">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto px-8 py-6">
             <div className="max-w-[680px] mx-auto space-y-8">
               {MOCK_MESSAGES.map((message) => (
                 <div key={message.id} className="group">
@@ -376,8 +378,8 @@ export default function ChatPage() {
 
                   {/* Citation Card */}
                   {message.citation && (
-                    <div className="mt-4 bg-card border border-border-01 rounded-lg overflow-hidden">
-                      <div className="border-l-2 border-accent p-4">
+                    <div className="mt-4 bg-card border border-border-01 rounded-md overflow-hidden">
+                      <div className="border-l-2 border-accent pl-5 pr-4 py-4">
                         <div className="flex items-center gap-2 mb-2">
                           <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -397,25 +399,25 @@ export default function ChatPage() {
           </div>
 
           {/* Input Area - GROUNDED */}
-          <div className="border-t border-border-02 p-4 bg-card">
+          <div className="border-t border-border-02 p-3 bg-card">
             <div className="max-w-[680px] mx-auto">
-              <div className="bg-card-02 border border-border-02 rounded-lg overflow-hidden focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/20 transition-all">
+              <div className="bg-card-02 border border-border-02 rounded-md overflow-hidden focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/20 transition-all">
                 <textarea
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={`Ask about ${selectedClient.name}'s tax situation...`}
-                  className="w-full bg-transparent text-sm text-text placeholder:text-text-tertiary resize-none outline-none p-4"
+                  className="w-full bg-white/[0.02] text-sm text-text placeholder:text-text-tertiary resize-none outline-none px-4 py-3"
                   rows={2}
                 />
-                <div className="flex items-center justify-between px-4 py-3 bg-card-03/50 border-t border-border-01">
+                <div className="flex items-center justify-between px-3 py-2 bg-card-03/50 border-t border-border-01">
                   <div className="flex items-center gap-2">
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
+                    <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                       </svg>
                       Attach
                     </button>
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
+                    <button className="flex items-center gap-1.5 px-3.5 py-2 text-xs text-text-secondary hover:text-text bg-card-02 hover:bg-card-03 border border-border-01 rounded-md transition-colors">
                       <span>Claude Sonnet 4</span>
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
