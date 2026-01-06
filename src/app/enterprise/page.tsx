@@ -8,28 +8,96 @@ const STATS = [
   { value: '<24h', label: 'Support response' },
 ];
 
-const BENEFITS = [
-  {
-    title: 'Security & Compliance',
-    description: 'SOC 2 Type II certified with enterprise-grade encryption at rest and in transit. Full audit trails for every action.',
-    icon: '🔒',
-  },
-  {
-    title: 'Dedicated Support',
-    description: 'Your own customer success manager, priority support queue, and custom onboarding for your team.',
-    icon: '🤝',
-  },
-  {
-    title: 'Custom Integrations',
-    description: 'Connect Margen to your existing tools with our API, webhooks, and pre-built integrations.',
-    icon: '🔗',
-  },
-  {
-    title: 'Scalability',
-    description: 'Handle thousands of returns without slowdowns. Add team members instantly as you grow.',
-    icon: '📈',
-  },
-];
+// Mockup Components for Benefits Section
+function SecurityMockup() {
+  return (
+    <div className="bg-card-02 rounded-xs border border-border-01 p-3 mb-4">
+      <div className="text-xs text-text-tertiary mb-2">Activity Log</div>
+      <div className="space-y-2">
+        <div className="flex items-start gap-2">
+          <span className="text-ansi-green text-xs">✓</span>
+          <div>
+            <div className="text-xs text-text">Sarah Chen viewed Form 1040</div>
+            <div className="text-xs text-text-tertiary">Today, 2:34 PM</div>
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-ansi-green text-xs">✓</span>
+          <div>
+            <div className="text-xs text-text">Mike Ross exported K-1 data</div>
+            <div className="text-xs text-text-tertiary">Today, 1:15 PM</div>
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-ansi-green text-xs">✓</span>
+          <div>
+            <div className="text-xs text-text">Jane Smith modified client...</div>
+            <div className="text-xs text-text-tertiary">Today, 11:42 AM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SupportMockup() {
+  return (
+    <div className="bg-card-02 rounded-xs border border-border-01 p-3 mb-4">
+      <div className="text-xs text-text-tertiary mb-2">Priority Support</div>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
+          <span className="text-xs text-accent">JP</span>
+        </div>
+        <div>
+          <div className="text-xs text-text">Jessica Park</div>
+          <div className="text-xs text-text-tertiary">Your CSM</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-xs">
+        <span className="bg-ansi-green/20 text-ansi-green px-2 py-0.5 rounded-full">Online</span>
+        <span className="text-text-tertiary">Response: &lt;2 hrs</span>
+      </div>
+    </div>
+  );
+}
+
+function IntegrationsMockup() {
+  return (
+    <div className="bg-card-02 rounded-xs border border-border-01 overflow-hidden mb-4">
+      <div className="px-3 py-1.5 border-b border-border-01 text-xs text-text-tertiary">
+        api/clients.ts
+      </div>
+      <div className="p-3 font-mono text-xs">
+        <div><span className="text-accent">POST</span> <span className="text-text">/api/v1/clients</span></div>
+        <div className="mt-2 text-text-tertiary">Authorization: Bearer sk_...</div>
+        <div className="mt-2 text-text-secondary">
+          {`{`} <span className="text-ansi-green">&quot;name&quot;</span>: <span className="text-accent">&quot;Acme Corp&quot;</span> {`}`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScalabilityMockup() {
+  return (
+    <div className="bg-card-02 rounded-xs border border-border-01 p-3 mb-4">
+      <div className="text-xs text-text-tertiary mb-2">Team Activity</div>
+      <div className="mb-3">
+        <div className="flex items-center justify-between text-xs mb-1">
+          <span className="text-text-secondary">Returns processed</span>
+          <span className="text-text tabular-nums">847</span>
+        </div>
+        <div className="h-2 bg-card-03 rounded-full overflow-hidden">
+          <div className="h-full bg-accent rounded-full" style={{ width: '72%' }} />
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-text-secondary">Active: <span className="text-text">24 members</span></span>
+        <span className="text-ansi-green">99.9% uptime</span>
+      </div>
+    </div>
+  );
+}
 
 const SECURITY_FEATURES = [
   {
@@ -133,13 +201,29 @@ export default function EnterprisePage() {
             </h2>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-g1">
-              {BENEFITS.map((benefit) => (
-                <div key={benefit.title} className="card p-6">
-                  <div className="text-2xl mb-4">{benefit.icon}</div>
-                  <h3 className="text-base font-medium text-text mb-2">{benefit.title}</h3>
-                  <p className="text-sm text-text-secondary">{benefit.description}</p>
-                </div>
-              ))}
+              <div className="card p-6">
+                <SecurityMockup />
+                <h3 className="text-base font-medium text-text mb-2">Security & Compliance</h3>
+                <p className="text-sm text-text-secondary">SOC 2 Type II certified with enterprise-grade encryption at rest and in transit. Full audit trails for every action.</p>
+              </div>
+
+              <div className="card p-6">
+                <SupportMockup />
+                <h3 className="text-base font-medium text-text mb-2">Dedicated Support</h3>
+                <p className="text-sm text-text-secondary">Your own customer success manager, priority support queue, and custom onboarding for your team.</p>
+              </div>
+
+              <div className="card p-6">
+                <IntegrationsMockup />
+                <h3 className="text-base font-medium text-text mb-2">Custom Integrations</h3>
+                <p className="text-sm text-text-secondary">Connect Margen to your existing tools with our API, webhooks, and pre-built integrations.</p>
+              </div>
+
+              <div className="card p-6">
+                <ScalabilityMockup />
+                <h3 className="text-base font-medium text-text mb-2">Scalability</h3>
+                <p className="text-sm text-text-secondary">Handle thousands of returns without slowdowns. Add team members instantly as you grow.</p>
+              </div>
             </div>
           </div>
         </section>

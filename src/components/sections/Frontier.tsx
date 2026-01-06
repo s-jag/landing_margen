@@ -17,7 +17,7 @@ export function Frontier() {
           <FrontierCard
             title="Access the best models"
             description="Choose between every cutting-edge model from OpenAI, Anthropic, and more."
-            link={{ label: 'Explore models', href: '/models' }}
+            link={{ label: 'Explore models', href: '/indexing' }}
           >
             <ModelDropdown />
           </FrontierCard>

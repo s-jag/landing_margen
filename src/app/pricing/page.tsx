@@ -136,14 +136,14 @@ export default function PricingPage() {
               </span>
               <button
                 onClick={() => setIsAnnual(!isAnnual)}
-                className={`relative w-14 h-7 rounded-full transition-colors ${
+                className={`relative w-12 h-6 rounded-full transition-colors ${
                   isAnnual ? 'bg-accent' : 'bg-card-03'
                 }`}
                 aria-label={`Switch to ${isAnnual ? 'monthly' : 'annual'} billing`}
               >
                 <span
-                  className={`absolute top-1 w-5 h-5 bg-text rounded-full transition-transform ${
-                    isAnnual ? 'translate-x-8' : 'translate-x-1'
+                  className={`absolute top-1 left-1 w-4 h-4 bg-text rounded-full transition-transform ${
+                    isAnnual ? 'translate-x-6' : 'translate-x-0'
                   }`}
                 />
               </button>

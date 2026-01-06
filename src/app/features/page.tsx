@@ -4,39 +4,6 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Header, Footer } from '@/components/layout';
 
-const ADDITIONAL_FEATURES = [
-  {
-    title: 'Model Selection',
-    description: 'Choose from GPT-4, Claude, Gemini, and more. Always use the best model for the task.',
-    icon: '🧠',
-  },
-  {
-    title: 'Multi-State Support',
-    description: 'Handle returns across all 50 states with jurisdiction-specific guidance.',
-    icon: '🗺️',
-  },
-  {
-    title: 'Audit Trail',
-    description: 'Complete history of every action. Know who did what, when, and why.',
-    icon: '📋',
-  },
-  {
-    title: 'Client Portal',
-    description: 'Secure document collection and delivery. Clients can upload and sign from anywhere.',
-    icon: '🔐',
-  },
-  {
-    title: 'Secure Sharing',
-    description: 'Share documents with expiring links, watermarks, and download tracking.',
-    icon: '🔗',
-  },
-  {
-    title: 'Mobile Access',
-    description: 'Review and approve from your phone. Push notifications for urgent items.',
-    icon: '📱',
-  },
-];
-
 const INTEGRATIONS = [
   'CCH Axcess',
   'Drake Software',
@@ -247,25 +214,6 @@ export default function FeaturesPage() {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Additional Features Grid */}
-        <section className="py-v4 px-g2">
-          <div className="mx-auto max-w-container">
-            <h2 className="text-xl text-text mb-v2 text-center">
-              And everything else you need
-            </h2>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-g1">
-              {ADDITIONAL_FEATURES.map((feature) => (
-                <div key={feature.title} className="card p-6">
-                  <div className="text-2xl mb-3">{feature.icon}</div>
-                  <h3 className="text-base font-medium text-text mb-2">{feature.title}</h3>
-                  <p className="text-sm text-text-secondary">{feature.description}</p>
-                </div>
-              ))}
             </div>
           </div>
         </section>
