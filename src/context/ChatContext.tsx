@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import type { ChatState, ChatAction, Client, ChatThread, Message, Document, DocumentType } from '@/types/chat';
+import type { ChatState, ChatAction, Client, ChatThread, Message, Document, DocumentType, Task, Citation } from '@/types/chat';
 import { chatService } from '@/services/chatService';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import {
@@ -32,12 +32,16 @@ const initialState: ChatState = {
   threads: INITIAL_THREADS,
   activeThreadId: INITIAL_THREADS[0]?.id || null,
   messagesByThread: INITIAL_MESSAGES,
+  tasks: [],
+  selectedTaskId: null,
   inputValue: '',
   isLoading: false,
   isTyping: false,
+  attachedFile: null,
   clientDropdownOpen: false,
   viewingDocument: null,
   uploadModalOpen: false,
+  viewingCitation: null,
 };
 
 // =============================================================================
@@ -146,6 +150,78 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       };
     }
 
+    // Task actions
+    case 'ADD_TASK':
+      return {
+        ...state,
+        tasks: [action.payload, ...state.tasks],
+      };
+
+    case 'UPDATE_TASK': {
+      const { taskId, updates } = action.payload;
+      return {
+        ...state,
+        tasks: state.tasks.map((task) =>
+          task.id === taskId ? { ...task, ...updates } : task
+        ),
+      };
+    }
+
+    case 'SET_SELECTED_TASK':
+      return {
+        ...state,
+        selectedTaskId: action.payload,
+      };
+
+    case 'ADVANCE_TASK_STEP': {
+      const taskId = action.payload;
+      return {
+        ...state,
+        tasks: state.tasks.map((task) => {
+          if (task.id !== taskId) return task;
+          const newSteps = task.steps.map((step, i) => {
+            if (i < task.currentStepIndex) return { ...step, status: 'done' as const };
+            if (i === task.currentStepIndex) return { ...step, status: 'done' as const };
+            if (i === task.currentStepIndex + 1) return { ...step, status: 'running' as const };
+            return step;
+          });
+          return {
+            ...task,
+            currentStepIndex: task.currentStepIndex + 1,
+            steps: newSteps,
+          };
+        }),
+      };
+    }
+
+    case 'COMPLETE_TASK':
+      return {
+        ...state,
+        tasks: state.tasks.map((task) =>
+          task.id === action.payload
+            ? {
+                ...task,
+                status: 'ready' as const,
+                steps: task.steps.map((s) => ({ ...s, status: 'done' as const })),
+              }
+            : task
+        ),
+      };
+
+    // File attachment
+    case 'SET_ATTACHED_FILE':
+      return {
+        ...state,
+        attachedFile: action.payload,
+      };
+
+    // Citation modal
+    case 'SET_VIEWING_CITATION':
+      return {
+        ...state,
+        viewingCitation: action.payload,
+      };
+
     default:
       return state;
   }
@@ -160,6 +236,9 @@ interface ChatContextValue extends ChatState {
   selectedClient: Client;
   activeMessages: Message[];
   activeThread: ChatThread | null;
+  selectedTask: Task | null;
+  inProgressTasks: Task[];
+  readyTasks: Task[];
 
   // Actions
   selectClient: (clientId: string) => void;
@@ -175,6 +254,19 @@ interface ChatContextValue extends ChatState {
   openUploadModal: () => void;
   closeUploadModal: () => void;
   addDocument: (name: string, type: DocumentType) => void;
+
+  // Task actions
+  selectTask: (taskId: string | null) => void;
+  addTask: (task: Task) => void;
+  advanceTaskStep: (taskId: string) => void;
+  completeTask: (taskId: string) => void;
+
+  // File attachment
+  setAttachedFile: (file: { name: string; size: number } | null) => void;
+
+  // Citation modal
+  openCitation: (citation: Citation) => void;
+  closeCitation: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -249,6 +341,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const activeMessages = state.activeThreadId
     ? state.messagesByThread[state.activeThreadId] || []
     : [];
+
+  const selectedTask = state.selectedTaskId
+    ? state.tasks.find((t) => t.id === state.selectedTaskId) || null
+    : null;
+
+  const inProgressTasks = state.tasks.filter((t) => t.status === 'in_progress');
+  const readyTasks = state.tasks.filter((t) => t.status === 'ready');
 
   // =============================================================================
   // ACTIONS
@@ -401,6 +500,46 @@ export function ChatProvider({ children }: ChatProviderProps) {
   );
 
   // =============================================================================
+  // TASK ACTIONS
+  // =============================================================================
+
+  const selectTask = useCallback((taskId: string | null) => {
+    dispatch({ type: 'SET_SELECTED_TASK', payload: taskId });
+  }, []);
+
+  const addTask = useCallback((task: Task) => {
+    dispatch({ type: 'ADD_TASK', payload: task });
+  }, []);
+
+  const advanceTaskStep = useCallback((taskId: string) => {
+    dispatch({ type: 'ADVANCE_TASK_STEP', payload: taskId });
+  }, []);
+
+  const completeTask = useCallback((taskId: string) => {
+    dispatch({ type: 'COMPLETE_TASK', payload: taskId });
+  }, []);
+
+  // =============================================================================
+  // FILE ATTACHMENT ACTIONS
+  // =============================================================================
+
+  const setAttachedFile = useCallback((file: { name: string; size: number } | null) => {
+    dispatch({ type: 'SET_ATTACHED_FILE', payload: file });
+  }, []);
+
+  // =============================================================================
+  // CITATION MODAL ACTIONS
+  // =============================================================================
+
+  const openCitation = useCallback((citation: Citation) => {
+    dispatch({ type: 'SET_VIEWING_CITATION', payload: citation });
+  }, []);
+
+  const closeCitation = useCallback(() => {
+    dispatch({ type: 'SET_VIEWING_CITATION', payload: null });
+  }, []);
+
+  // =============================================================================
   // CONTEXT VALUE
   // =============================================================================
 
@@ -409,6 +548,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
     selectedClient,
     activeMessages,
     activeThread,
+    selectedTask,
+    inProgressTasks,
+    readyTasks,
     selectClient,
     setClientDropdownOpen,
     selectThread,
@@ -420,6 +562,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
     openUploadModal,
     closeUploadModal,
     addDocument,
+    selectTask,
+    addTask,
+    advanceTaskStep,
+    completeTask,
+    setAttachedFile,
+    openCitation,
+    closeCitation,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

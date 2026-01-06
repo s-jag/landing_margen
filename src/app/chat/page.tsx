@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { ChatProvider, useChat } from '@/context/ChatContext';
 import { getStateBadgeColor, formatCurrency, getDocIcon } from '@/lib/chatUtils';
 import {
+  CitationModal,
   ClientSelector,
   ThreadList,
   MessageList,
   ChatInput,
   DocumentViewer,
   DocumentUpload,
+  TaskDetail,
 } from './components';
 
 // =============================================================================
@@ -120,6 +122,8 @@ function RightSidebar() {
 // =============================================================================
 
 function ChatContent() {
+  const { selectedTask } = useChat();
+
   return (
     <>
       <div className="h-screen bg-bg flex flex-col">
@@ -148,11 +152,15 @@ function ChatContent() {
             <ThreadList />
           </aside>
 
-          {/* Center - Chat Area */}
-          <main className="flex-1 flex flex-col bg-bg overflow-hidden">
-            <MessageList />
-            <ChatInput />
-          </main>
+          {/* Center - Chat Area or Task Detail */}
+          {selectedTask ? (
+            <TaskDetail />
+          ) : (
+            <main className="flex-1 flex flex-col bg-bg overflow-hidden">
+              <MessageList />
+              <ChatInput />
+            </main>
+          )}
 
           {/* Right Panel - Context */}
           <RightSidebar />
@@ -162,6 +170,7 @@ function ChatContent() {
       {/* Modals */}
       <DocumentViewer />
       <DocumentUpload />
+      <CitationModal />
     </>
   );
 }

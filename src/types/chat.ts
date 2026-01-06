@@ -43,6 +43,29 @@ export interface Message {
 export interface Citation {
   source: string;
   excerpt: string;
+  fullText?: string;
+}
+
+// =============================================================================
+// TASK TYPES (for async workflow)
+// =============================================================================
+
+export type TaskStatus = 'in_progress' | 'ready' | 'complete';
+
+export interface TaskStep {
+  label: string;
+  status: 'pending' | 'running' | 'done';
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  currentStepIndex: number;
+  steps: TaskStep[];
+  startedAt: string;
+  threadId?: string;
+  attachedFile?: string;
 }
 
 export interface ComparisonOption {
@@ -95,10 +118,15 @@ export interface ChatState {
   // Messages state (keyed by threadId)
   messagesByThread: Record<string, Message[]>;
 
+  // Task state (for async workflows)
+  tasks: Task[];
+  selectedTaskId: string | null;
+
   // UI state
   inputValue: string;
   isLoading: boolean;
   isTyping: boolean;
+  attachedFile: { name: string; size: number } | null;
 
   // Dropdown states
   clientDropdownOpen: boolean;
@@ -106,6 +134,9 @@ export interface ChatState {
   // Document modal states
   viewingDocument: Document | null;
   uploadModalOpen: boolean;
+
+  // Citation modal
+  viewingCitation: Citation | null;
 }
 
 export type ChatAction =
@@ -121,4 +152,14 @@ export type ChatAction =
   | { type: 'UPDATE_THREAD_TIMESTAMP'; payload: { threadId: string; timestamp: string } }
   | { type: 'SET_VIEWING_DOCUMENT'; payload: Document | null }
   | { type: 'SET_UPLOAD_MODAL_OPEN'; payload: boolean }
-  | { type: 'ADD_DOCUMENT'; payload: { clientId: string; document: Document } };
+  | { type: 'ADD_DOCUMENT'; payload: { clientId: string; document: Document } }
+  // Task actions
+  | { type: 'ADD_TASK'; payload: Task }
+  | { type: 'UPDATE_TASK'; payload: { taskId: string; updates: Partial<Task> } }
+  | { type: 'SET_SELECTED_TASK'; payload: string | null }
+  | { type: 'ADVANCE_TASK_STEP'; payload: string }
+  | { type: 'COMPLETE_TASK'; payload: string }
+  // File attachment
+  | { type: 'SET_ATTACHED_FILE'; payload: { name: string; size: number } | null }
+  // Citation modal
+  | { type: 'SET_VIEWING_CITATION'; payload: Citation | null };

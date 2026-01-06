@@ -7,7 +7,7 @@ import { ComparisonCard } from './ComparisonCard';
 import { TypingIndicator } from './TypingIndicator';
 
 export function MessageList() {
-  const { activeMessages, isTyping } = useChat();
+  const { activeMessages, isTyping, openCitation } = useChat();
 
   const { containerRef, handleScroll, scrollToBottom } = useAutoScroll<HTMLDivElement>(
     [activeMessages.length, isTyping],
@@ -60,13 +60,33 @@ export function MessageList() {
             {/* Comparison Cards */}
             {message.comparison && <ComparisonCard options={message.comparison.options} />}
 
-            {/* Citation Card */}
+            {/* Citation Card - Clickable */}
             {message.citation && (
-              <div className="mt-4 bg-card border border-border-01 rounded-md overflow-hidden">
+              <button
+                type="button"
+                onClick={() => openCitation(message.citation!)}
+                className="mt-4 w-full text-left bg-card border border-border-01 rounded-md overflow-hidden hover:border-accent/50 hover:bg-card-02 transition-colors cursor-pointer group"
+              >
                 <div className="border-l-2 border-accent pl-5 pr-4 py-4">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 text-text-tertiary"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      <span className="text-xs text-text-secondary font-medium">Source</span>
+                    </div>
                     <svg
-                      className="w-4 h-4 text-text-tertiary"
+                      className="w-4 h-4 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -75,17 +95,23 @@ export function MessageList() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                       />
                     </svg>
-                    <span className="text-xs text-text-secondary font-medium">Source</span>
                   </div>
-                  <div className="text-sm font-medium text-text">{message.citation.source}</div>
+                  <div className="text-sm font-medium text-text group-hover:text-accent transition-colors">
+                    {message.citation.source}
+                  </div>
                   <div className="text-sm text-text-secondary mt-2 italic leading-relaxed">
                     &quot;{message.citation.excerpt}&quot;
                   </div>
+                  {message.citation.fullText && (
+                    <div className="mt-2 text-xs text-accent opacity-0 group-hover:opacity-100 transition-opacity">
+                      Click to view full source
+                    </div>
+                  )}
                 </div>
-              </div>
+              </button>
             )}
           </div>
         ))}

@@ -167,6 +167,39 @@ Solo 401(k) typically offers the highest contribution limits and flexibility. Th
     },
   },
 
+  floridaSalesTax: {
+    content: `I've analyzed the transaction data for Florida Sales Tax liability. Here are my findings:
+
+**Key Determination:**
+While pure SaaS is generally exempt in Florida under recent guidance, the accompanying consulting services in this dataset are taxable.
+
+**Breakdown:**
+- **Software Subscriptions**: Exempt under § 212.05(1) - not tangible personal property
+- **Consulting Services**: Taxable at 6% state + 1% Miami-Dade surtax
+- **Implementation Fees**: Mixed treatment - review individual contracts
+
+**Miami-Dade County Surtax:**
+The current discretionary surtax rate is 1%, bringing total taxable rate to 7%.
+
+**Recommended Action:**
+Based on the Q4 transactions totaling $127,450 in consulting revenue, estimated sales tax liability is approximately **$8,921.50**.`,
+    citation: {
+      source: 'Florida Statute § 212.05(1)',
+      excerpt: 'There is hereby levied on each taxable transaction a privilege tax of 6 percent of the sales price of each item of tangible personal property...',
+      fullText: `Florida Statute § 212.05 - Sales, storage, use tax
+
+(1)(a) There is hereby levied on each taxable transaction or incident a tax of 6 percent of the sales price of each item or article of tangible personal property when sold at retail in this state, computed on each taxable sale for the purpose of remitting the amount of tax due the state.
+
+(b) Each occasional or isolated sale of tangible personal property, other than a sale which is exempt from the tax imposed by this chapter, is subject to the tax imposed by this section.
+
+**Computer Software Treatment:**
+Per Rule 12A-1.032, computer software delivered electronically is not considered tangible personal property and is exempt from sales tax. However, custom software development and consulting services remain taxable as the sale of a service rather than property.
+
+**Miami-Dade County Discretionary Surtax:**
+Pursuant to TIP 22B01-01, Miami-Dade County levies an additional 1% discretionary sales surtax on the first $5,000 of any single taxable transaction, bringing the combined rate to 7% for most business transactions.`,
+    },
+  },
+
   default: {
     content: `I can help you research tax questions for this client. Here are some areas I can assist with:
 
@@ -218,6 +251,10 @@ function selectMockResponse(message: string): MockResponseTemplate {
 
   if (lower.includes('retire') || lower.includes('401k') || lower.includes('sep') || lower.includes('ira') || lower.includes('pension')) {
     return MOCK_RESPONSES.retirement;
+  }
+
+  if (lower.includes('florida') || lower.includes('sales tax') || lower.includes('saas') || lower.includes('212.05') || lower.includes('miami')) {
+    return MOCK_RESPONSES.floridaSalesTax;
   }
 
   return MOCK_RESPONSES.default;

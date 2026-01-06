@@ -1,9 +1,11 @@
 export { ChatInput } from './ChatInput';
+export { CitationModal } from './CitationModal';
 export { ClientSelector } from './ClientSelector';
 export { ComparisonCard } from './ComparisonCard';
 export { DocumentUpload } from './DocumentUpload';
 export { DocumentViewer } from './DocumentViewer';
 export { MessageList } from './MessageList';
 export { Modal } from './Modal';
+export { TaskDetail } from './TaskDetail';
 export { ThreadList } from './ThreadList';
 export { TypingIndicator } from './TypingIndicator';
