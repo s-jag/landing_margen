@@ -1,0 +1,427 @@
+import type {
+  QueryOptions,
+  RAGQueryResponse,
+  SourceDetail,
+  StatuteWithRules,
+  RelatedDocuments,
+  HealthResponse,
+  StreamEvent,
+} from '@/types/api';
+
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+
+const RAG_API_BASE_URL = process.env.RAG_API_BASE_URL || 'http://localhost:8000';
+const RAG_API_KEY = process.env.RAG_API_KEY || '';
+
+const DEFAULT_TIMEOUT = 60000; // 60 seconds
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+function getHeaders(): HeadersInit {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (RAG_API_KEY) {
+    headers['Authorization'] = `Bearer ${RAG_API_KEY}`;
+  }
+
+  return headers;
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let errorMessage: string;
+
+    try {
+      const errorJson = JSON.parse(errorBody);
+      errorMessage = errorJson.message || errorJson.error || `HTTP ${response.status}`;
+    } catch {
+      errorMessage = errorBody || `HTTP ${response.status}`;
+    }
+
+    throw new Error(`RAG API Error: ${errorMessage}`);
+  }
+
+  return response.json();
+}
+
+// =============================================================================
+// RAG SERVICE
+// =============================================================================
+
+export const ragService = {
+  /**
+   * Execute a synchronous RAG query
+   */
+  async query(
+    query: string,
+    options?: QueryOptions
+  ): Promise<RAGQueryResponse> {
+    const response = await fetch(`${RAG_API_BASE_URL}/api/v1/query`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        query,
+        options: {
+          doc_types: options?.docTypes,
+          tax_year: options?.taxYear,
+          expand_graph: options?.expandGraph ?? true,
+          include_reasoning: options?.includeReasoning ?? false,
+          timeout_seconds: options?.timeoutSeconds ?? 60,
+        },
+      }),
+      signal: AbortSignal.timeout(options?.timeoutSeconds ? options.timeoutSeconds * 1000 : DEFAULT_TIMEOUT),
+    });
+
+    return handleResponse<RAGQueryResponse>(response);
+  },
+
+  /**
+   * Execute a streaming RAG query
+   * Returns an async generator that yields StreamEvent objects
+   */
+  async *streamQuery(
+    query: string,
+    options?: QueryOptions
+  ): AsyncGenerator<StreamEvent> {
+    const response = await fetch(`${RAG_API_BASE_URL}/api/v1/query/stream`, {
+      method: 'POST',
+      headers: {
+        ...getHeaders(),
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify({
+        query,
+        options: {
+          doc_types: options?.docTypes,
+          tax_year: options?.taxYear,
+          expand_graph: options?.expandGraph ?? true,
+          include_reasoning: options?.includeReasoning ?? false,
+          timeout_seconds: options?.timeoutSeconds ?? 60,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      yield {
+        type: 'error',
+        error: 'REQUEST_FAILED',
+        message: `RAG API Error: ${errorText}`,
+      };
+      return;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      yield {
+        type: 'error',
+        error: 'NO_RESPONSE_BODY',
+        message: 'No response body from RAG API',
+      };
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE events
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (data) {
+              try {
+                const event = JSON.parse(data);
+                yield transformRAGEvent(event);
+              } catch {
+                // Skip malformed JSON
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  },
+
+  /**
+   * Get detailed information about a source chunk
+   */
+  async getSource(chunkId: string): Promise<SourceDetail> {
+    const response = await fetch(
+      `${RAG_API_BASE_URL}/api/v1/sources/${encodeURIComponent(chunkId)}`,
+      {
+        method: 'GET',
+        headers: getHeaders(),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
+      }
+    );
+
+    const data = await handleResponse<{
+      chunk_id: string;
+      doc_id: string;
+      doc_type: string;
+      level: string;
+      text: string;
+      text_with_ancestry: string;
+      ancestry: string;
+      citation: string;
+      effective_date?: string;
+      token_count: number;
+      parent_chunk_id?: string;
+      child_chunk_ids: string[];
+      related_doc_ids: string[];
+    }>(response);
+
+    return {
+      chunkId: data.chunk_id,
+      docId: data.doc_id,
+      docType: data.doc_type as 'statute' | 'rule' | 'case' | 'taa',
+      level: data.level,
+      text: data.text,
+      textWithAncestry: data.text_with_ancestry,
+      ancestry: data.ancestry,
+      citation: data.citation,
+      effectiveDate: data.effective_date,
+      tokenCount: data.token_count,
+      parentChunkId: data.parent_chunk_id,
+      childChunkIds: data.child_chunk_ids,
+      relatedDocIds: data.related_doc_ids,
+    };
+  },
+
+  /**
+   * Get a statute with its implementing rules and interpreting documents
+   */
+  async getStatute(section: string): Promise<StatuteWithRules> {
+    const response = await fetch(
+      `${RAG_API_BASE_URL}/api/v1/statute/${encodeURIComponent(section)}`,
+      {
+        method: 'GET',
+        headers: getHeaders(),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
+      }
+    );
+
+    const data = await handleResponse<{
+      statute: {
+        doc_id: string;
+        title: string;
+        text: string;
+        effective_date: string;
+      };
+      implementing_rules: Array<{ doc_id: string; title: string; citation: string }>;
+      interpreting_cases: Array<{ doc_id: string; title: string; citation: string }>;
+      interpreting_taas: Array<{ doc_id: string; title: string; citation: string }>;
+    }>(response);
+
+    return {
+      statute: {
+        docId: data.statute.doc_id,
+        title: data.statute.title,
+        text: data.statute.text,
+        effectiveDate: data.statute.effective_date,
+      },
+      implementingRules: data.implementing_rules.map((r) => ({
+        docId: r.doc_id,
+        title: r.title,
+        citation: r.citation,
+      })),
+      interpretingCases: data.interpreting_cases.map((c) => ({
+        docId: c.doc_id,
+        title: c.title,
+        citation: c.citation,
+      })),
+      interpretingTaas: data.interpreting_taas.map((t) => ({
+        docId: t.doc_id,
+        title: t.title,
+        citation: t.citation,
+      })),
+    };
+  },
+
+  /**
+   * Get documents related via citations
+   */
+  async getRelatedDocs(docId: string): Promise<RelatedDocuments> {
+    const response = await fetch(
+      `${RAG_API_BASE_URL}/api/v1/graph/${encodeURIComponent(docId)}/related`,
+      {
+        method: 'GET',
+        headers: getHeaders(),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
+      }
+    );
+
+    const data = await handleResponse<{
+      doc_id: string;
+      citing_documents: Array<{ doc_id: string; doc_type: string; citation: string }>;
+      cited_documents: Array<{ doc_id: string; doc_type: string; citation: string }>;
+      interpretation_chain?: {
+        implementing_rules: Array<{ doc_id: string; citation: string }>;
+        interpreting_cases: Array<{ doc_id: string; citation: string }>;
+        interpreting_taas: Array<{ doc_id: string; citation: string }>;
+      };
+    }>(response);
+
+    return {
+      docId: data.doc_id,
+      citingDocuments: data.citing_documents.map((d) => ({
+        docId: d.doc_id,
+        docType: d.doc_type,
+        citation: d.citation,
+      })),
+      citedDocuments: data.cited_documents.map((d) => ({
+        docId: d.doc_id,
+        docType: d.doc_type,
+        citation: d.citation,
+      })),
+      interpretationChain: data.interpretation_chain
+        ? {
+            implementingRules: data.interpretation_chain.implementing_rules.map((r) => ({
+              docId: r.doc_id,
+              citation: r.citation,
+            })),
+            interpretingCases: data.interpretation_chain.interpreting_cases.map((c) => ({
+              docId: c.doc_id,
+              citation: c.citation,
+            })),
+            interpretingTaas: data.interpretation_chain.interpreting_taas.map((t) => ({
+              docId: t.doc_id,
+              citation: t.citation,
+            })),
+          }
+        : undefined,
+    };
+  },
+
+  /**
+   * Check the health of the RAG API and its services
+   */
+  async checkHealth(): Promise<HealthResponse> {
+    try {
+      const response = await fetch(`${RAG_API_BASE_URL}/api/v1/health`, {
+        method: 'GET',
+        headers: getHeaders(),
+        signal: AbortSignal.timeout(10000), // 10 second timeout for health check
+      });
+
+      const data = await handleResponse<{
+        status: 'healthy' | 'degraded' | 'unhealthy';
+        services: Array<{
+          name: string;
+          healthy: boolean;
+          latency_ms?: number;
+          error?: string;
+        }>;
+        timestamp: string;
+      }>(response);
+
+      return {
+        status: data.status,
+        services: data.services.map((s) => ({
+          name: s.name,
+          healthy: s.healthy,
+          latencyMs: s.latency_ms,
+          error: s.error,
+        })),
+        timestamp: data.timestamp,
+      };
+    } catch (error) {
+      // Return unhealthy status if we can't reach the RAG API
+      return {
+        status: 'unhealthy',
+        services: [
+          {
+            name: 'rag-api',
+            healthy: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+};
+
+// =============================================================================
+// HELPER: Transform RAG API events to our format
+// =============================================================================
+
+function transformRAGEvent(event: Record<string, unknown>): StreamEvent {
+  // Status event
+  if ('message' in event && typeof event.message === 'string' && !('answer' in event)) {
+    return { type: 'status', message: event.message };
+  }
+
+  // Reasoning event
+  if ('step_number' in event && 'node' in event && 'description' in event) {
+    return {
+      type: 'reasoning',
+      step: event.step_number as number,
+      node: event.node as string,
+      description: event.description as string,
+    };
+  }
+
+  // Chunk event
+  if ('chunks' in event && Array.isArray(event.chunks)) {
+    return {
+      type: 'chunk',
+      chunks: (event.chunks as Array<{ chunk_id: string; citation: string; relevance_score: number }>).map((c) => ({
+        chunkId: c.chunk_id,
+        citation: c.citation,
+        relevanceScore: c.relevance_score,
+      })),
+    };
+  }
+
+  // Answer event
+  if ('answer' in event && typeof event.answer === 'string') {
+    return { type: 'answer', content: event.answer };
+  }
+
+  // Complete event
+  if ('request_id' in event && 'confidence' in event && 'processing_time_ms' in event) {
+    return {
+      type: 'complete',
+      metadata: {
+        requestId: event.request_id as string,
+        confidence: event.confidence as number,
+        processingTimeMs: event.processing_time_ms as number,
+        citationCount: (event.citation_count as number) || 0,
+        sourceCount: (event.source_count as number) || 0,
+      },
+    };
+  }
+
+  // Error event
+  if ('error' in event) {
+    return {
+      type: 'error',
+      error: event.error as string,
+      message: (event.message as string) || 'Unknown error',
+    };
+  }
+
+  // Unknown event type - treat as status
+  return { type: 'status', message: JSON.stringify(event) };
+}
