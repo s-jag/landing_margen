@@ -144,7 +144,7 @@ export default function FeaturesPage() {
                     Hallucination detection built-in
                   </li>
                 </ul>
-                <Link href="/indexing" className="link-accent inline-flex items-center gap-1">
+                <Link href="/resources/solving-hallucination-in-regulatory-ai" className="link-accent inline-flex items-center gap-1">
                   How it works
                   <span>→</span>
                 </Link>

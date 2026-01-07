@@ -17,7 +17,7 @@ export function Frontier() {
           <FrontierCard
             title="Access the best models"
             description="Choose between every cutting-edge model from OpenAI, Anthropic, and more."
-            link={{ label: 'Explore models', href: '/indexing' }}
+            link={{ label: 'Explore models', href: '/resources/solving-hallucination-in-regulatory-ai' }}
           >
             <ModelDropdown />
           </FrontierCard>
@@ -25,7 +25,7 @@ export function Frontier() {
           <FrontierCard
             title="Complete tax code understanding"
             description="Margen learns how tax code works, no matter the complexity."
-            link={{ label: 'Learn about indexing', href: '/indexing' }}
+            link={{ label: 'Learn about indexing', href: '/resources/solving-hallucination-in-regulatory-ai' }}
           >
             <SearchDemo />
           </FrontierCard>
