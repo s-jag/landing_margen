@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export function useLocalStorage<T>(
   key: string,
@@ -22,6 +22,10 @@ export function useLocalStorage<T>(
     }
   });
 
+  // Use ref to avoid stale closure in setValue
+  const storedValueRef = useRef(storedValue);
+  storedValueRef.current = storedValue;
+
   // Return a wrapped version of useState's setter function that
   // persists the new value to localStorage
   const setValue = useCallback(
@@ -29,7 +33,7 @@ export function useLocalStorage<T>(
       try {
         // Allow value to be a function so we have same API as useState
         const valueToStore =
-          value instanceof Function ? value(storedValue) : value;
+          value instanceof Function ? value(storedValueRef.current) : value;
 
         // Save state
         setStoredValue(valueToStore);
@@ -42,7 +46,7 @@ export function useLocalStorage<T>(
         console.warn(`Error setting localStorage key "${key}":`, error);
       }
     },
-    [key, storedValue]
+    [key]
   );
 
   // Listen for changes from other tabs/windows

@@ -130,6 +130,7 @@ export const ragService = {
 
     const decoder = new TextDecoder();
     let buffer = '';
+    let currentEventType = '';
 
     try {
       while (true) {
@@ -139,21 +140,32 @@ export const ragService = {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Process complete SSE events
+        // Process complete SSE events (split by double newline for event boundaries)
         const lines = buffer.split('\n');
         buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          // Track event type from "event:" lines
+          if (line.startsWith('event: ')) {
+            currentEventType = line.slice(7).trim();
+          }
+          // Process data lines
+          else if (line.startsWith('data: ')) {
             const data = line.slice(6).trim();
             if (data) {
               try {
-                const event = JSON.parse(data);
-                yield transformRAGEvent(event);
+                const jsonData = JSON.parse(data);
+                // Add the event type to the data if we have one
+                const eventWithType = currentEventType
+                  ? { ...jsonData, _eventType: currentEventType }
+                  : jsonData;
+                yield transformRAGEvent(eventWithType);
               } catch {
                 // Skip malformed JSON
               }
             }
+            // Reset event type after processing
+            currentEventType = '';
           }
         }
       }
@@ -367,53 +379,79 @@ export const ragService = {
 // =============================================================================
 
 function transformRAGEvent(event: Record<string, unknown>): StreamEvent {
-  // Status event
-  if ('message' in event && typeof event.message === 'string' && !('answer' in event)) {
-    return { type: 'status', message: event.message };
+  const eventType = event._eventType as string | undefined;
+
+  // Use explicit event type from SSE if available
+  switch (eventType) {
+    case 'status':
+      return {
+        type: 'status',
+        message: (event.description as string) || (event.node as string) || JSON.stringify(event),
+      };
+
+    case 'reasoning':
+      return {
+        type: 'reasoning',
+        step: (event.step_number as number) || 0,
+        node: (event.node as string) || 'processing',
+        description: (event.description as string) || '',
+      };
+
+    case 'chunk':
+      // Single chunk from FastAPI
+      return {
+        type: 'chunk',
+        chunks: [{
+          chunkId: event.chunk_id as string,
+          citation: event.citation as string,
+          relevanceScore: (event.relevance_score as number) || 0.5,
+        }],
+      };
+
+    case 'answer':
+      return {
+        type: 'answer',
+        content: (event.answer as string) || (event.content as string) || (event.text as string) || '',
+      };
+
+    case 'complete':
+      return {
+        type: 'complete',
+        metadata: {
+          requestId: (event.request_id as string) || '',
+          confidence: (event.confidence as number) || 0,
+          processingTimeMs: (event.processing_time_ms as number) || 0,
+          citationCount: (event.citation_count as number) || 0,
+          sourceCount: (event.source_count as number) || 0,
+        },
+      };
+
+    case 'error':
+      return {
+        type: 'error',
+        error: (event.error as string) || 'UNKNOWN_ERROR',
+        message: (event.message as string) || 'Unknown error',
+      };
   }
 
-  // Reasoning event
-  if ('step_number' in event && 'node' in event && 'description' in event) {
-    return {
-      type: 'reasoning',
-      step: event.step_number as number,
-      node: event.node as string,
-      description: event.description as string,
-    };
-  }
-
-  // Chunk event
-  if ('chunks' in event && Array.isArray(event.chunks)) {
-    return {
-      type: 'chunk',
-      chunks: (event.chunks as Array<{ chunk_id: string; citation: string; relevance_score: number }>).map((c) => ({
-        chunkId: c.chunk_id,
-        citation: c.citation,
-        relevanceScore: c.relevance_score,
-      })),
-    };
-  }
-
-  // Answer event
+  // Fallback: Try to infer event type from content (for backwards compatibility)
   if ('answer' in event && typeof event.answer === 'string') {
     return { type: 'answer', content: event.answer };
   }
 
-  // Complete event
-  if ('request_id' in event && 'confidence' in event && 'processing_time_ms' in event) {
+  if ('request_id' in event && 'confidence' in event) {
     return {
       type: 'complete',
       metadata: {
         requestId: event.request_id as string,
         confidence: event.confidence as number,
-        processingTimeMs: event.processing_time_ms as number,
+        processingTimeMs: (event.processing_time_ms as number) || 0,
         citationCount: (event.citation_count as number) || 0,
         sourceCount: (event.source_count as number) || 0,
       },
     };
   }
 
-  // Error event
   if ('error' in event) {
     return {
       type: 'error',
