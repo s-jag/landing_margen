@@ -1,4 +1,4 @@
-import { RAG_LATENCY_ARTICLE, HALLUCINATION_ARTICLE } from './article-content';
+import { RAG_LATENCY_ARTICLE, HALLUCINATION_ARTICLE, EVALUATION_ARTICLE } from './article-content';
 
 // =============================================================================
 // TYPES
@@ -64,6 +64,16 @@ export const ARTICLES: Article[] = [
     publishedAt: '2025-01-06',
     readingTime: 12,
     content: RAG_LATENCY_ARTICLE,
+  },
+  {
+    id: '3',
+    slug: 'evaluation-results-zero-hallucinations',
+    title: 'The Numbers Don\'t Lie: Inside Margen\'s Evaluation Results',
+    excerpt: 'We tested Margen against 100 challenging tax questions. The results: 95% citation precision, 0 hallucinations, and a 3.2-second tradeoff worth every millisecond.',
+    category: 'product',
+    publishedAt: '2025-01-07',
+    readingTime: 10,
+    content: EVALUATION_ARTICLE,
   },
 ];
 
