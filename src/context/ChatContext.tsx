@@ -384,6 +384,7 @@ interface ChatContextValue extends ChatState {
   createThread: () => void;
   sendMessage: (content: string) => Promise<void>;
   setInputValue: (value: string) => void;
+  refreshClients: () => Promise<void>;
 
   // Document actions
   openDocumentViewer: (document: Document) => void;
@@ -469,24 +470,51 @@ export function ChatProvider({ children }: ChatProviderProps) {
     });
   }, [state.threads, state.messagesByThread, state.selectedClientId, state.activeThreadId, state.clients, setPersistedState]);
 
+  // Helper function to transform client data from API
+  const transformClientData = useCallback((clientsData: { data?: Record<string, unknown>[] }): Client[] => {
+    return (clientsData.data || []).map((c: Record<string, unknown>) => ({
+      id: c.id as string,
+      name: c.name as string,
+      state: c.state as string,
+      taxYear: c.tax_year as number,
+      filingStatus: c.filing_status as string,
+      ssn: `***-**-${c.ssn_last_four || '****'}`,
+      grossIncome: c.gross_income as number || 0,
+      schedCRevenue: c.sched_c_revenue as number || 0,
+      dependents: c.dependents as number || 0,
+      documents: [], // Documents loaded separately
+    }));
+  }, []);
+
+  // Refresh clients from API
+  const refreshClients = useCallback(async () => {
+    try {
+      const response = await fetch('/api/test-clients');
+      if (response.ok) {
+        const data = await response.json();
+        const transformedClients = transformClientData(data);
+        if (transformedClients.length > 0) {
+          dispatch({ type: 'SET_CLIENTS', payload: transformedClients });
+          // Select newly created client (last one)
+          dispatch({ type: 'SET_SELECTED_CLIENT', payload: transformedClients[0].id });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh clients:', error);
+    }
+  }, [transformClientData]);
+
   // Load initial data from API
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         dispatch({ type: 'SET_INITIAL_LOADING', payload: true });
 
-        // Fetch clients and threads in parallel
+        // Fetch clients and threads in parallel (use test endpoints to bypass auth)
         const [clientsRes, threadsRes] = await Promise.all([
-          fetch('/api/clients'),
-          fetch('/api/threads'),
+          fetch('/api/test-clients'),
+          fetch('/api/test-threads'),
         ]);
-
-        // If not authenticated, both will fail - that's handled by middleware
-        if (!clientsRes.ok && clientsRes.status === 401) {
-          // User not authenticated, skip API loading (will use mock data)
-          dispatch({ type: 'SET_INITIAL_LOADING', payload: false });
-          return;
-        }
 
         const [clientsData, threadsData] = await Promise.all([
           clientsRes.ok ? clientsRes.json() : { data: [] },
@@ -494,18 +522,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         ]);
 
         // Transform database format to frontend format
-        const transformedClients: Client[] = (clientsData.data || []).map((c: Record<string, unknown>) => ({
-          id: c.id as string,
-          name: c.name as string,
-          state: c.state as string,
-          taxYear: c.tax_year as number,
-          filingStatus: c.filing_status as string,
-          ssn: `***-**-${c.ssn_last_four || '****'}`,
-          grossIncome: c.gross_income as number || 0,
-          schedCRevenue: c.sched_c_revenue as number || 0,
-          dependents: c.dependents as number || 0,
-          documents: [], // Documents loaded separately
-        }));
+        const transformedClients = transformClientData(clientsData);
 
         const transformedThreads: ChatThread[] = (threadsData.data || []).map((t: Record<string, unknown>) => ({
           id: t.id as string,
@@ -529,7 +546,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     };
 
     loadInitialData();
-  }, []);
+  }, [transformClientData]);
 
   // =============================================================================
   // DERIVED STATE
@@ -567,14 +584,79 @@ export function ChatProvider({ children }: ChatProviderProps) {
     dispatch({ type: 'SET_CLIENT_DROPDOWN_OPEN', payload: open });
   }, []);
 
-  const selectThread = useCallback((threadId: string) => {
+  const selectThread = useCallback(async (threadId: string) => {
     dispatch({ type: 'SET_ACTIVE_THREAD', payload: threadId });
-  }, []);
 
-  const createThread = useCallback(() => {
-    const newThread = createNewThread(state.selectedClientId);
-    dispatch({ type: 'CREATE_THREAD', payload: newThread });
-  }, [state.selectedClientId]);
+    // Load messages from API if not already loaded
+    if (!state.messagesByThread[threadId]) {
+      try {
+        const response = await fetch(`/api/test-messages?threadId=${threadId}`);
+        if (response.ok) {
+          const data = await response.json();
+          const messages: Message[] = (data.data || []).map((m: Record<string, unknown>) => ({
+            id: m.id as string,
+            role: m.role as 'user' | 'assistant',
+            content: m.content as string,
+            timestamp: new Date(m.created_at as string).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+            citation: m.citation as Citation | undefined,
+            sources: m.sources as SourceChip[] | undefined,
+          }));
+          dispatch({
+            type: 'LOAD_PERSISTED_STATE',
+            payload: {
+              messagesByThread: {
+                ...state.messagesByThread,
+                [threadId]: messages,
+              },
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
+    }
+  }, [state.messagesByThread]);
+
+  const createThread = useCallback(async () => {
+    const localThread = createNewThread(state.selectedClientId);
+
+    // Create optimistically in UI
+    dispatch({ type: 'CREATE_THREAD', payload: localThread });
+
+    // Persist to API
+    try {
+      const response = await fetch('/api/test-threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: state.selectedClientId,
+          title: localThread.title,
+        }),
+      });
+
+      if (response.ok) {
+        const dbThread = await response.json();
+        // Update with real database ID
+        dispatch({
+          type: 'LOAD_PERSISTED_STATE',
+          payload: {
+            threads: state.threads.map((t) =>
+              t.id === localThread.id
+                ? { ...t, id: dbThread.id }
+                : t
+            ),
+            activeThreadId: dbThread.id,
+            messagesByThread: {
+              ...state.messagesByThread,
+              [dbThread.id]: state.messagesByThread[localThread.id] || [],
+            },
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Failed to persist thread:', error);
+    }
+  }, [state.selectedClientId, state.threads, state.messagesByThread]);
 
   const setInputValue = useCallback((value: string) => {
     dispatch({ type: 'SET_INPUT_VALUE', payload: value });
@@ -585,12 +667,53 @@ export function ChatProvider({ children }: ChatProviderProps) {
       if (!content.trim() || state.isLoading || state.isTyping) return;
 
       let threadId = state.activeThreadId;
+      let isNewThread = false;
 
-      // If no active thread, create one
+      // If no active thread, create one via API
       if (!threadId) {
-        const newThread = createNewThread(state.selectedClientId);
-        dispatch({ type: 'CREATE_THREAD', payload: newThread });
-        threadId = newThread.id;
+        isNewThread = true;
+        const title = generateThreadTitleFromMessage(content);
+
+        try {
+          const response = await fetch('/api/test-threads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              clientId: state.selectedClientId,
+              title,
+            }),
+          });
+
+          if (response.ok) {
+            const dbThread = await response.json();
+            threadId = dbThread.id;
+            dispatch({
+              type: 'CREATE_THREAD',
+              payload: {
+                id: dbThread.id,
+                clientId: state.selectedClientId,
+                title,
+                timestamp: getRelativeTimestamp(new Date()),
+              },
+            });
+          } else {
+            // Fallback to local-only thread
+            const localThread = createNewThread(state.selectedClientId);
+            dispatch({ type: 'CREATE_THREAD', payload: localThread });
+            threadId = localThread.id;
+          }
+        } catch {
+          // Fallback to local-only thread
+          const localThread = createNewThread(state.selectedClientId);
+          dispatch({ type: 'CREATE_THREAD', payload: localThread });
+          threadId = localThread.id;
+        }
+      }
+
+      // TypeScript safety: ensure threadId is not null
+      if (!threadId) {
+        console.error('Failed to create thread');
+        return;
       }
 
       // Create user message
@@ -602,9 +725,24 @@ export function ChatProvider({ children }: ChatProviderProps) {
         payload: { threadId, message: userMessage },
       });
 
+      // Persist user message to API
+      try {
+        await fetch('/api/test-messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            threadId,
+            role: 'user',
+            content,
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to persist user message:', error);
+      }
+
       // Update thread title if this is the first message
       const existingMessages = state.messagesByThread[threadId] || [];
-      if (existingMessages.length === 0) {
+      if (!isNewThread && existingMessages.length === 0) {
         const title = generateThreadTitleFromMessage(content);
         dispatch({
           type: 'LOAD_PERSISTED_STATE',
@@ -634,7 +772,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         let citation: Citation | undefined;
         const collectedSources: SourceChip[] = [];
 
-        // Use streaming API
+        // Use streaming API with client context
         for await (const event of chatService.streamMessage({
           message: content,
           clientId: state.selectedClientId,
@@ -690,6 +828,22 @@ export function ChatProvider({ children }: ChatProviderProps) {
                 type: 'FINALIZE_MESSAGE',
                 payload: { threadId: threadId!, message: assistantMessage },
               });
+
+              // Persist assistant message to API
+              try {
+                await fetch('/api/test-messages', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    threadId,
+                    role: 'assistant',
+                    content: fullContent,
+                    citation,
+                  }),
+                });
+              } catch (error) {
+                console.error('Failed to persist assistant message:', error);
+              }
               break;
 
             case 'error':
@@ -895,6 +1049,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     createThread,
     sendMessage,
     setInputValue,
+    refreshClients,
     openDocumentViewer,
     closeDocumentViewer,
     openUploadModal,

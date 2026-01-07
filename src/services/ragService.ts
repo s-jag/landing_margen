@@ -85,11 +85,19 @@ export const ragService = {
   /**
    * Execute a streaming RAG query
    * Returns an async generator that yields StreamEvent objects
+   * Accepts optional client context for jurisdiction-specific answers
    */
   async *streamQuery(
     query: string,
-    options?: QueryOptions
+    options?: QueryOptions,
+    clientContext?: { state?: string; filingStatus?: string }
   ): AsyncGenerator<StreamEvent> {
+    // Build the query with client context if provided
+    let enrichedQuery = query;
+    if (clientContext?.state) {
+      enrichedQuery = `[Client State: ${clientContext.state}${clientContext.filingStatus ? `, Filing Status: ${clientContext.filingStatus}` : ''}] ${query}`;
+    }
+
     const response = await fetch(`${RAG_API_BASE_URL}/api/v1/query/stream`, {
       method: 'POST',
       headers: {
@@ -97,7 +105,7 @@ export const ragService = {
         'Accept': 'text/event-stream',
       },
       body: JSON.stringify({
-        query,
+        query: enrichedQuery,
         options: {
           doc_types: options?.docTypes,
           tax_year: options?.taxYear,

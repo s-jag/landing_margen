@@ -52,14 +52,22 @@ class RealChatService implements ChatService {
 
   /**
    * Stream a message via the /api/test-query endpoint (SSE) - bypasses auth
+   * Includes client state and filing status for jurisdiction-specific answers
    */
   async *streamMessage(request: ChatRequest): AsyncGenerator<StreamEvent> {
+    // Extract client context for RAG
+    const clientContext = request.context?.clientData ? {
+      state: request.context.clientData.state,
+      filingStatus: request.context.clientData.filingStatus,
+    } : undefined;
+
     // Use test endpoint that bypasses auth
     const response = await fetch('/api/test-query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: request.message,
+        clientContext,
       }),
     });
 

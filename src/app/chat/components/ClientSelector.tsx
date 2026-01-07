@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChat } from '@/context/ChatContext';
+import { CreateClientModal } from './CreateClientModal';
 
 export function ClientSelector() {
   const {
@@ -11,9 +12,11 @@ export function ClientSelector() {
     clientDropdownOpen,
     setClientDropdownOpen,
     selectClient,
+    refreshClients,
   } = useChat();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -80,9 +83,33 @@ export function ClientSelector() {
                 </div>
               </button>
             ))}
+
+            {/* Divider and Create Button */}
+            <div className="border-t border-border-01">
+              <button
+                type="button"
+                onClick={() => {
+                  setClientDropdownOpen(false);
+                  setIsCreateModalOpen(true);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-card-03 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="text-sm text-accent font-medium">New Client</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Create Client Modal */}
+      <CreateClientModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onClientCreated={refreshClients}
+      />
     </div>
   );
 }

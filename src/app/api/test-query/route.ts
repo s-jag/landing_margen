@@ -5,11 +5,14 @@ import { ragService } from '@/services/ragService';
  *
  * This endpoint bypasses Supabase auth and database operations
  * to test direct connectivity to the FastAPI backend.
+ *
+ * Accepts optional clientContext with state and filingStatus for
+ * jurisdiction-specific answers.
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { query } = body;
+    const { query, clientContext } = body;
 
     if (!query || typeof query !== 'string') {
       return new Response(
@@ -26,7 +29,8 @@ export async function POST(request: Request) {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'status', message: 'Connecting to RAG API...' })}\n\n`));
 
-          for await (const event of ragService.streamQuery(query, { includeReasoning: true })) {
+          // Pass client context to RAG service for jurisdiction-aware queries
+          for await (const event of ragService.streamQuery(query, { includeReasoning: true }, clientContext)) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
           }
 
