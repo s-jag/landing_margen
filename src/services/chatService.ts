@@ -17,16 +17,28 @@ export interface ChatService {
 class RealChatService implements ChatService {
   /**
    * Send a synchronous message via the /api/query endpoint
+   * Falls back to test endpoint in development if auth fails
    */
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
-    // Use test endpoint that bypasses auth
-    const response = await fetch('/api/test-query', {
+    // Try production endpoint first
+    let response = await fetch('/api/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: request.message,
       }),
     });
+
+    if (response.status === 401) {
+      // Fall back to test endpoint in development
+      response = await fetch('/api/test-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: request.message,
+        }),
+      });
+    }
 
     if (!response.ok) {
       const error = await response.json();
@@ -51,7 +63,8 @@ class RealChatService implements ChatService {
   }
 
   /**
-   * Stream a message via the /api/test-query endpoint (SSE) - bypasses auth
+   * Stream a message via the /api/query/stream endpoint (SSE)
+   * Falls back to test endpoint in development if auth fails
    * Includes client state and filing status for jurisdiction-specific answers
    */
   async *streamMessage(request: ChatRequest): AsyncGenerator<StreamEvent> {
@@ -61,8 +74,8 @@ class RealChatService implements ChatService {
       filingStatus: request.context.clientData.filingStatus,
     } : undefined;
 
-    // Use test endpoint that bypasses auth
-    const response = await fetch('/api/test-query', {
+    // Try production endpoint first
+    let response = await fetch('/api/query/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -70,6 +83,18 @@ class RealChatService implements ChatService {
         clientContext,
       }),
     });
+
+    if (response.status === 401) {
+      // Fall back to test endpoint in development
+      response = await fetch('/api/test-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: request.message,
+          clientContext,
+        }),
+      });
+    }
 
     if (!response.ok) {
       const error = await response.json();

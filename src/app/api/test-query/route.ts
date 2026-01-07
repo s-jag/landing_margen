@@ -1,7 +1,12 @@
+import { NextResponse } from 'next/server';
 import { ragService } from '@/services/ragService';
+
+// Block test endpoints in production
+const isProduction = process.env.NODE_ENV === 'production';
 
 /**
  * POST /api/test-query - Direct RAG query (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  *
  * This endpoint bypasses Supabase auth and database operations
  * to test direct connectivity to the FastAPI backend.
@@ -10,6 +15,9 @@ import { ragService } from '@/services/ragService';
  * jurisdiction-specific answers.
  */
 export async function POST(request: Request) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const body = await request.json();
     const { query, clientContext } = body;

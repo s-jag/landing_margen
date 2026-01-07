@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 
+// Block test endpoints in production
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Default user ID for testing (bypasses auth)
 const DEFAULT_USER_ID = process.env.TEST_USER_ID || 'test-user-001';
 
 /**
  * GET /api/test-threads - List all threads (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  * Supports query param: ?clientId=xxx to filter by client
  */
 export async function GET(request: Request) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const supabase = createAdminClient();
     const { searchParams } = new URL(request.url);
@@ -42,8 +49,12 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/test-threads - Create a new thread (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  */
 export async function POST(request: Request) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const supabase = createAdminClient();
     const body = await request.json();

@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
 
+// Block test endpoints in production
+const isProduction = process.env.NODE_ENV === 'production';
+
 const RAG_API_BASE_URL = process.env.RAG_API_BASE_URL || 'http://localhost:8000';
 
 /**
  * GET /api/test-sources/[chunkId] - Fetch source details (NO AUTH - for testing)
+ * BLOCKED IN PRODUCTION
  */
 export async function GET(
   request: Request,
   { params }: { params: { chunkId: string } }
 ) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const { chunkId } = params;
 

@@ -489,7 +489,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
   // Refresh clients from API
   const refreshClients = useCallback(async () => {
     try {
-      const response = await fetch('/api/test-clients');
+      // Use production endpoint (falls back to test in development if auth fails)
+      let response = await fetch('/api/clients');
+      if (response.status === 401) {
+        // Fall back to test endpoint in development
+        response = await fetch('/api/test-clients');
+      }
       if (response.ok) {
         const data = await response.json();
         const transformedClients = transformClientData(data);
@@ -510,11 +515,19 @@ export function ChatProvider({ children }: ChatProviderProps) {
       try {
         dispatch({ type: 'SET_INITIAL_LOADING', payload: true });
 
-        // Fetch clients and threads in parallel (use test endpoints to bypass auth)
-        const [clientsRes, threadsRes] = await Promise.all([
-          fetch('/api/test-clients'),
-          fetch('/api/test-threads'),
+        // Try production endpoints first, fall back to test endpoints in development
+        let [clientsRes, threadsRes] = await Promise.all([
+          fetch('/api/clients'),
+          fetch('/api/threads'),
         ]);
+
+        // Fall back to test endpoints if auth fails (development mode)
+        if (clientsRes.status === 401 || threadsRes.status === 401) {
+          [clientsRes, threadsRes] = await Promise.all([
+            fetch('/api/test-clients'),
+            fetch('/api/test-threads'),
+          ]);
+        }
 
         const [clientsData, threadsData] = await Promise.all([
           clientsRes.ok ? clientsRes.json() : { data: [] },
@@ -590,7 +603,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
     // Load messages from API if not already loaded
     if (!state.messagesByThread[threadId]) {
       try {
-        const response = await fetch(`/api/test-messages?threadId=${threadId}`);
+        // Try production endpoint first
+        let response = await fetch(`/api/threads/${threadId}/messages`);
+        if (response.status === 401) {
+          // Fall back to test endpoint in development
+          response = await fetch(`/api/test-messages?threadId=${threadId}`);
+        }
         if (response.ok) {
           const data = await response.json();
           const messages: Message[] = (data.data || []).map((m: Record<string, unknown>) => ({
@@ -623,9 +641,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
     // Create optimistically in UI
     dispatch({ type: 'CREATE_THREAD', payload: localThread });
 
-    // Persist to API
+    // Persist to API - try production first, fall back to test
     try {
-      const response = await fetch('/api/test-threads', {
+      let response = await fetch('/api/threads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -633,6 +651,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
           title: localThread.title,
         }),
       });
+
+      if (response.status === 401) {
+        // Fall back to test endpoint in development
+        response = await fetch('/api/test-threads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: state.selectedClientId,
+            title: localThread.title,
+          }),
+        });
+      }
 
       if (response.ok) {
         const dbThread = await response.json();
@@ -675,7 +705,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const title = generateThreadTitleFromMessage(content);
 
         try {
-          const response = await fetch('/api/test-threads', {
+          // Try production endpoint first
+          let response = await fetch('/api/threads', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -683,6 +714,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
               title,
             }),
           });
+
+          if (response.status === 401) {
+            // Fall back to test endpoint in development
+            response = await fetch('/api/test-threads', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientId: state.selectedClientId,
+                title,
+              }),
+            });
+          }
 
           if (response.ok) {
             const dbThread = await response.json();
@@ -727,15 +770,28 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
       // Persist user message to API
       try {
-        await fetch('/api/test-messages', {
+        // Try production endpoint first
+        let msgResponse = await fetch(`/api/threads/${threadId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            threadId,
             role: 'user',
             content,
           }),
         });
+
+        if (msgResponse.status === 401) {
+          // Fall back to test endpoint in development
+          await fetch('/api/test-messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              threadId,
+              role: 'user',
+              content,
+            }),
+          });
+        }
       } catch (error) {
         console.error('Failed to persist user message:', error);
       }
@@ -831,16 +887,29 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
               // Persist assistant message to API
               try {
-                await fetch('/api/test-messages', {
+                // Try production endpoint first
+                let asstResponse = await fetch(`/api/threads/${threadId}/messages`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    threadId,
                     role: 'assistant',
                     content: fullContent,
-                    citation,
                   }),
                 });
+
+                if (asstResponse.status === 401) {
+                  // Fall back to test endpoint in development
+                  await fetch('/api/test-messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      threadId,
+                      role: 'assistant',
+                      content: fullContent,
+                      citation,
+                    }),
+                  });
+                }
               } catch (error) {
                 console.error('Failed to persist assistant message:', error);
               }
@@ -996,7 +1065,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
     });
 
     try {
-      const response = await fetch(`/api/test-sources/${encodeURIComponent(chunkId)}`);
+      // Try production endpoint first
+      let response = await fetch(`/api/sources/${encodeURIComponent(chunkId)}`);
+      if (response.status === 401) {
+        // Fall back to test endpoint in development
+        response = await fetch(`/api/test-sources/${encodeURIComponent(chunkId)}`);
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch source');

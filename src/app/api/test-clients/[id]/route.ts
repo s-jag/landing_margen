@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 
+// Block test endpoints in production
+const isProduction = process.env.NODE_ENV === 'production';
+
 /**
  * GET /api/test-clients/[id] - Get a single client (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const { id } = await params;
     const supabase = createAdminClient();
@@ -37,11 +44,15 @@ export async function GET(
 
 /**
  * DELETE /api/test-clients/[id] - Delete a client (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const { id } = await params;
     const supabase = createAdminClient();

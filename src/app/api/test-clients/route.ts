@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 
+// Block test endpoints in production
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Default organization ID for testing (bypasses auth)
 const DEFAULT_ORG_ID = process.env.TEST_ORGANIZATION_ID || 'test-org-001';
 
 /**
  * GET /api/test-clients - List all clients (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  */
 export async function GET() {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const supabase = createAdminClient();
 
@@ -33,8 +40,12 @@ export async function GET() {
 
 /**
  * POST /api/test-clients - Create a new client (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  */
 export async function POST(request: Request) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const supabase = createAdminClient();
     const body = await request.json();

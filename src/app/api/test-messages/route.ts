@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 
+// Block test endpoints in production
+const isProduction = process.env.NODE_ENV === 'production';
+
 /**
  * GET /api/test-messages - List messages for a thread (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  * Requires query param: ?threadId=xxx
  */
 export async function GET(request: Request) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const supabase = createAdminClient();
     const { searchParams } = new URL(request.url);
@@ -41,8 +48,12 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/test-messages - Create a new message (NO AUTH - for testing only)
+ * BLOCKED IN PRODUCTION
  */
 export async function POST(request: Request) {
+  if (isProduction) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  }
   try {
     const supabase = createAdminClient();
     const body = await request.json();
