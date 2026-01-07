@@ -20,6 +20,7 @@ export function MessageList() {
     streamStatus,
     streamError,
     openCitation,
+    fetchSourceAndOpen,
   } = useChat();
 
   const { containerRef, handleScroll, scrollToBottom } = useAutoScroll<HTMLDivElement>(
@@ -69,6 +70,21 @@ export function MessageList() {
                 </p>
               ))}
             </div>
+
+            {/* Source Chips for completed messages */}
+            {message.sources && message.sources.length > 0 && (
+              <div className="mt-4">
+                <SourceChips
+                  sources={message.sources}
+                  onSourceClick={(chunkId) => {
+                    const source = message.sources?.find(s => s.chunkId === chunkId);
+                    if (source) {
+                      fetchSourceAndOpen(chunkId, source.citation);
+                    }
+                  }}
+                />
+              </div>
+            )}
 
             {/* Comparison Cards */}
             {message.comparison && <ComparisonCard options={message.comparison.options} />}
@@ -137,9 +153,17 @@ export function MessageList() {
               <ReasoningSteps steps={reasoningSteps} isStreaming={!streamingContent} />
             )}
 
-            {/* Source Chips */}
+            {/* Source Chips - Clickable */}
             {pendingSources.length > 0 && (
-              <SourceChips sources={pendingSources} />
+              <SourceChips
+                sources={pendingSources}
+                onSourceClick={(chunkId) => {
+                  const source = pendingSources.find(s => s.chunkId === chunkId);
+                  if (source) {
+                    fetchSourceAndOpen(chunkId, source.citation);
+                  }
+                }}
+              />
             )}
 
             {/* Streaming Message or Typing Indicator */}

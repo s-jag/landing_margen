@@ -407,6 +407,7 @@ interface ChatContextValue extends ChatState {
   // Citation modal
   openCitation: (citation: Citation) => void;
   closeCitation: () => void;
+  fetchSourceAndOpen: (chunkId: string, citation: string) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -631,6 +632,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       try {
         let fullContent = '';
         let citation: Citation | undefined;
+        const collectedSources: SourceChip[] = [];
 
         // Use streaming API
         for await (const event of chatService.streamMessage({
@@ -656,12 +658,15 @@ export function ChatProvider({ children }: ChatProviderProps) {
               break;
 
             case 'chunk':
+              // Collect sources for final message
+              collectedSources.push(...event.chunks);
               dispatch({ type: 'ADD_PENDING_SOURCES', payload: event.chunks });
               // Use first chunk as citation if we have sources
               if (event.chunks.length > 0 && !citation) {
                 citation = {
                   source: event.chunks[0].citation,
                   excerpt: 'View source for full details',
+                  chunkId: event.chunks[0].chunkId,
                 };
               }
               break;
@@ -672,13 +677,14 @@ export function ChatProvider({ children }: ChatProviderProps) {
               break;
 
             case 'complete':
-              // Finalize the message
+              // Finalize the message with sources
               const assistantMessage: Message = {
                 id: `msg-${Date.now()}`,
                 role: 'assistant',
                 content: fullContent,
                 timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
                 citation,
+                sources: collectedSources.length > 0 ? collectedSources : undefined,
               };
               dispatch({
                 type: 'FINALIZE_MESSAGE',
@@ -823,6 +829,53 @@ export function ChatProvider({ children }: ChatProviderProps) {
     dispatch({ type: 'SET_VIEWING_CITATION', payload: null });
   }, []);
 
+  const fetchSourceAndOpen = useCallback(async (chunkId: string, citation: string) => {
+    // Show loading state immediately
+    dispatch({
+      type: 'SET_VIEWING_CITATION',
+      payload: {
+        source: citation,
+        excerpt: 'Loading source text...',
+        isLoading: true,
+        chunkId,
+      },
+    });
+
+    try {
+      const response = await fetch(`/api/test-sources/${encodeURIComponent(chunkId)}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch source');
+      }
+
+      const data = await response.json();
+
+      dispatch({
+        type: 'SET_VIEWING_CITATION',
+        payload: {
+          source: data.citation || citation,
+          excerpt: data.textWithAncestry || data.text || 'No text available',
+          fullText: data.text,
+          link: data.link,
+          docType: data.docType,
+          chunkId: data.chunkId,
+          isLoading: false,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to fetch source:', error);
+      dispatch({
+        type: 'SET_VIEWING_CITATION',
+        payload: {
+          source: citation,
+          excerpt: 'Failed to load source text. Please try again.',
+          isLoading: false,
+          chunkId,
+        },
+      });
+    }
+  }, []);
+
   // =============================================================================
   // CONTEXT VALUE
   // =============================================================================
@@ -857,6 +910,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     uploadError: state.uploadError,
     openCitation,
     closeCitation,
+    fetchSourceAndOpen,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

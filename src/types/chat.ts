@@ -38,12 +38,17 @@ export interface Message {
   timestamp: string;
   citation?: Citation;
   comparison?: Comparison;
+  sources?: SourceChip[];
 }
 
 export interface Citation {
   source: string;
   excerpt: string;
   fullText?: string;
+  link?: string;
+  docType?: string;
+  chunkId?: string;
+  isLoading?: boolean;
 }
 
 // =============================================================================
