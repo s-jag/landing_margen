@@ -1,9 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
 import { queryRequestSchema, type Citation } from '@/types/api';
 import { ragService } from '@/services/ragService';
+import { queryLimiter, getIdentifier, rateLimitResponse } from '@/lib/rateLimit';
 
 /**
  * POST /api/query/stream - Execute a streaming RAG query (SSE)
+ * Rate limited: 20 requests per minute
  */
 export async function POST(request: Request) {
   try {
@@ -15,6 +17,13 @@ export async function POST(request: Request) {
         JSON.stringify({ error: 'UNAUTHORIZED', message: 'Authentication required' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Check rate limit
+    const identifier = getIdentifier(request, user.id);
+    const rateLimitResult = await queryLimiter.check(identifier);
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
     }
 
     // Parse and validate request body

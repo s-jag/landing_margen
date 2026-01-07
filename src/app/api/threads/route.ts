@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createThreadSchema } from '@/types/api';
+import { standardLimiter, checkRateLimit } from '@/lib/rateLimit';
 
 /**
  * GET /api/threads - List all threads for the authenticated user
+ * Rate limited: 60 requests per minute
  */
 export async function GET(request: Request) {
   try {
@@ -13,6 +15,10 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'UNAUTHORIZED', message: 'Authentication required' }, { status: 401 });
     }
+
+    // Check rate limit
+    const rateLimitError = await checkRateLimit(request, standardLimiter, user.id);
+    if (rateLimitError) return rateLimitError;
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -57,6 +63,7 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/threads - Create a new thread
+ * Rate limited: 60 requests per minute
  */
 export async function POST(request: Request) {
   try {
@@ -66,6 +73,10 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'UNAUTHORIZED', message: 'Authentication required' }, { status: 401 });
     }
+
+    // Check rate limit
+    const rateLimitError = await checkRateLimit(request, standardLimiter, user.id);
+    if (rateLimitError) return rateLimitError;
 
     // Parse and validate request body
     const body = await request.json();

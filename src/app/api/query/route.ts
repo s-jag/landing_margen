@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { queryRequestSchema, type QueryResponse, type Citation, type Source } from '@/types/api';
 import { ragService } from '@/services/ragService';
+import { queryLimiter, checkRateLimit } from '@/lib/rateLimit';
 
 /**
  * POST /api/query - Execute a synchronous RAG query
+ * Rate limited: 20 requests per minute
  */
 export async function POST(request: Request) {
   try {
@@ -14,6 +16,10 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'UNAUTHORIZED', message: 'Authentication required' }, { status: 401 });
     }
+
+    // Check rate limit
+    const rateLimitError = await checkRateLimit(request, queryLimiter, user.id);
+    if (rateLimitError) return rateLimitError;
 
     // Parse and validate request body
     const body = await request.json();

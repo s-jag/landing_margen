@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { documentTypeSchema } from '@/types/api';
+import { uploadLimiter, checkRateLimit } from '@/lib/rateLimit';
 
 /**
  * POST /api/documents/upload - Upload a document file
+ * Rate limited: 10 uploads per 5 minutes
  *
  * Expects multipart/form-data with:
  * - file: The file to upload
@@ -19,6 +21,10 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'UNAUTHORIZED', message: 'Authentication required' }, { status: 401 });
     }
+
+    // Check rate limit (strict for uploads)
+    const rateLimitError = await checkRateLimit(request, uploadLimiter, user.id);
+    if (rateLimitError) return rateLimitError;
 
     // Parse multipart form data
     const formData = await request.formData();

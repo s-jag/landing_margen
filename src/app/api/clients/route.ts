@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClientSchema } from '@/types/api';
+import { standardLimiter, checkRateLimit } from '@/lib/rateLimit';
 
 /**
  * GET /api/clients - List all clients for the authenticated user's organization
+ * Rate limited: 60 requests per minute
  */
 export async function GET(request: Request) {
   try {
@@ -13,6 +15,10 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'UNAUTHORIZED', message: 'Authentication required' }, { status: 401 });
     }
+
+    // Check rate limit
+    const rateLimitError = await checkRateLimit(request, standardLimiter, user.id);
+    if (rateLimitError) return rateLimitError;
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -65,6 +71,7 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/clients - Create a new client
+ * Rate limited: 60 requests per minute
  */
 export async function POST(request: Request) {
   try {
@@ -74,6 +81,10 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'UNAUTHORIZED', message: 'Authentication required' }, { status: 401 });
     }
+
+    // Check rate limit
+    const rateLimitError = await checkRateLimit(request, standardLimiter, user.id);
+    if (rateLimitError) return rateLimitError;
 
     // Get user's organization
     const { data: userData } = await supabase
