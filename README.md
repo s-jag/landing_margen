@@ -84,7 +84,12 @@ src/
 │   ├── constants.ts      # App constants
 │   └── utils.ts          # Utility functions
 ├── services/
+│   ├── chatService.ts    # Chat API (sync & streaming)
 │   └── ragService.ts     # RAG API integration
+├── hooks/
+│   ├── useAuth.ts        # Authentication hook
+│   ├── useAutoScroll.ts  # Auto-scroll for chat
+│   └── useLocalStorage.ts # Persistent state
 └── types/
     ├── api.ts            # API types & Zod schemas
     ├── database.ts       # Database types
@@ -177,6 +182,23 @@ Three-panel research assistant:
 - **Left:** Client selector + chat history
 - **Center:** Conversation with citations
 - **Right:** Client context & documents
+
+#### Streaming Features
+- **Real-time responses** - Progressive text display with blinking cursor
+- **Reasoning steps** - Collapsible timeline showing RAG processing
+- **Source chips** - Clickable references with relevance scores
+- **File upload** - Document type selector with drag-and-drop support
+
+#### Components
+```
+src/app/chat/components/
+├── MessageList.tsx      # Message display with streaming support
+├── ChatInput.tsx        # Input with file upload
+├── StreamingMessage.tsx # Progressive answer display
+├── ReasoningSteps.tsx   # RAG reasoning timeline
+├── SourceChips.tsx      # Clickable source references
+└── ...
+```
 
 ## Features
 

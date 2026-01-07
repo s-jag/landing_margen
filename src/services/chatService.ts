@@ -1,4 +1,4 @@
-import type { ChatRequest, ChatResponse, Citation, Comparison } from '@/types/chat';
+import type { ChatRequest, ChatResponse, Citation, StreamEvent } from '@/types/chat';
 import { generateMessageId, getCurrentTimestamp } from '@/lib/chatUtils';
 
 // =============================================================================
@@ -7,287 +7,192 @@ import { generateMessageId, getCurrentTimestamp } from '@/lib/chatUtils';
 
 export interface ChatService {
   sendMessage(request: ChatRequest): Promise<ChatResponse>;
+  streamMessage(request: ChatRequest): AsyncGenerator<StreamEvent>;
 }
 
 // =============================================================================
-// MOCK RESPONSE DATA
+// REAL CHAT SERVICE (API Integration)
 // =============================================================================
 
-interface MockResponseTemplate {
-  content: string;
-  citation?: Citation;
-  comparison?: Comparison;
-}
-
-const MOCK_RESPONSES: Record<string, MockResponseTemplate> = {
-  homeOffice: {
-    content: `Based on the client's Schedule C activity, they may qualify for the home office deduction under IRC §280A. The key requirements are:
-
-1. Regular and exclusive use for business
-2. Principal place of business OR place to meet clients
-
-For most taxpayers, I recommend comparing both methods to determine which provides the greater benefit.`,
-    citation: {
-      source: 'IRC Section 280A(c)(1)',
-      excerpt: 'A portion of the dwelling unit which is exclusively used on a regular basis as the principal place of business for any trade or business of the taxpayer...',
-    },
-    comparison: {
-      options: [
-        {
-          title: 'Simplified Method',
-          formula: 'Up to 300 sq ft × $5',
-          result: 'Max $1,500',
-          recommended: true,
+class RealChatService implements ChatService {
+  /**
+   * Send a synchronous message via the /api/query endpoint
+   */
+  async sendMessage(request: ChatRequest): Promise<ChatResponse> {
+    const response = await fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: request.message,
+        clientId: request.clientId,
+        threadId: request.threadId,
+        options: {
+          includeReasoning: true,
         },
-        {
-          title: 'Regular Method',
-          formula: 'Actual expenses × business %',
-          result: 'Varies',
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to send message');
+    }
+
+    const data = await response.json();
+
+    // Transform API response to ChatResponse format
+    const citation: Citation | undefined = data.citations?.[0] ? {
+      source: data.citations[0].citation,
+      excerpt: data.citations[0].excerpt,
+      fullText: data.sources?.[0]?.text,
+    } : undefined;
+
+    return {
+      id: data.id || generateMessageId(),
+      content: data.answer,
+      timestamp: getCurrentTimestamp(),
+      citation,
+    };
+  }
+
+  /**
+   * Stream a message via the /api/query/stream endpoint (SSE)
+   */
+  async *streamMessage(request: ChatRequest): AsyncGenerator<StreamEvent> {
+    const response = await fetch('/api/query/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: request.message,
+        clientId: request.clientId,
+        threadId: request.threadId,
+        options: {
+          includeReasoning: true,
         },
-      ],
-    },
-  },
+      }),
+    });
 
-  qbi: {
-    content: `The Qualified Business Income (QBI) deduction under IRC §199A allows eligible taxpayers to deduct up to 20% of qualified business income from pass-through entities.
+    if (!response.ok) {
+      const error = await response.json();
+      yield { type: 'error', error: 'REQUEST_FAILED', message: error.message || 'Failed to start stream' };
+      return;
+    }
 
-Key limitations to consider:
-- W-2 wage limitation applies above income thresholds
-- Specified service trades or businesses (SSTBs) have additional restrictions
-- The deduction is limited to the greater of 50% of W-2 wages OR 25% of W-2 wages plus 2.5% of qualified property`,
-    citation: {
-      source: 'IRC Section 199A',
-      excerpt: 'In the case of a taxpayer other than a corporation, there shall be allowed as a deduction for any taxable year an amount equal to the sum of the combined qualified business income amount...',
-    },
-  },
+    const reader = response.body?.getReader();
+    if (!reader) {
+      yield { type: 'error', error: 'NO_RESPONSE_BODY', message: 'No response body' };
+      return;
+    }
 
-  depreciation: {
-    content: `For business assets, you have several depreciation options under the tax code:
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-1. **Section 179 Expensing**: Immediate deduction up to $1,160,000 (2024)
-2. **Bonus Depreciation**: 60% in 2024 (phasing down)
-3. **MACRS**: Standard depreciation over asset life
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
 
-The optimal choice depends on current year income, expected future income, and business cash flow needs.`,
-    citation: {
-      source: 'IRC Section 179 & 168(k)',
-      excerpt: 'A taxpayer may elect to treat the cost of any section 179 property as an expense which is not chargeable to capital account...',
-    },
-    comparison: {
-      options: [
-        {
-          title: 'Section 179',
-          formula: '100% Year 1',
-          result: 'Full deduction',
-          recommended: true,
-        },
-        {
-          title: 'MACRS 5-Year',
-          formula: '20%, 32%, 19.2%...',
-          result: 'Spread over time',
-        },
-      ],
-    },
-  },
+        if (done) break;
 
-  vehicle: {
-    content: `For business vehicle deductions, taxpayers can choose between two methods:
+        buffer += decoder.decode(value, { stream: true });
 
-1. **Standard Mileage Rate**: 67 cents per mile for 2024
-2. **Actual Expense Method**: Deduct actual costs (gas, insurance, repairs, depreciation) × business use percentage
+        // Process complete SSE events
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-The standard mileage rate is simpler, but actual expenses may provide a larger deduction for expensive vehicles or high operating costs.`,
-    citation: {
-      source: 'IRS Rev. Proc. 2023-34',
-      excerpt: 'The standard mileage rate for transportation expenses paid or incurred is 67 cents per mile for all miles of business use...',
-    },
-  },
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
 
-  dependents: {
-    content: `For tax year 2024, dependent-related tax benefits include:
+            // Check for stream end
+            if (data === '[DONE]') {
+              return;
+            }
 
-- **Child Tax Credit**: Up to $2,000 per qualifying child under 17
-- **Credit for Other Dependents**: $500 for qualifying relatives
-- **Child and Dependent Care Credit**: Up to $3,000 (1 qualifying individual) or $6,000 (2+)
-- **Earned Income Tax Credit**: Enhanced amounts for qualifying children
-
-I recommend reviewing the client's filing status and household composition to optimize these credits.`,
-    citation: {
-      source: 'IRC Sections 24 & 32',
-      excerpt: 'There shall be allowed as a credit against the tax imposed by this chapter for the taxable year with respect to each qualifying child of the taxpayer...',
-    },
-  },
-
-  income: {
-    content: `Based on the client's income sources, here's an overview of the tax treatment:
-
-- **W-2 Income**: Subject to income tax and FICA (already withheld)
-- **1099-NEC**: Subject to income tax plus self-employment tax (15.3%)
-- **Schedule C**: Net profit subject to SE tax after business deductions
-- **K-1 Income**: Treatment depends on entity type and material participation
-
-The key is to maximize above-the-line deductions and credits to reduce overall tax liability.`,
-  },
-
-  deduction: {
-    content: `Common deductions to consider for this client:
-
-**Above-the-Line Deductions:**
-- Self-employed health insurance
-- Self-employment tax deduction (50%)
-- Retirement contributions (SEP, SIMPLE, Solo 401k)
-- Student loan interest
-
-**Itemized vs. Standard:**
-The 2024 standard deduction is $14,600 (single) or $29,200 (MFJ). Compare with potential itemized deductions (mortgage interest, state taxes up to $10k SALT cap, charitable contributions).`,
-  },
-
-  retirement: {
-    content: `For self-employed clients, retirement contribution options include:
-
-1. **SEP-IRA**: Up to 25% of net SE income (max $69,000 for 2024)
-2. **Solo 401(k)**: Employee + employer contributions up to $69,000
-3. **SIMPLE IRA**: Up to $16,000 employee + 3% employer match
-
-Solo 401(k) typically offers the highest contribution limits and flexibility. The deadline for establishing a SEP or Solo 401(k) is the tax return due date (including extensions).`,
-    comparison: {
-      options: [
-        {
-          title: 'Solo 401(k)',
-          formula: '$23,000 + 25% profits',
-          result: 'Max $69,000',
-          recommended: true,
-        },
-        {
-          title: 'SEP-IRA',
-          formula: '25% of net SE income',
-          result: 'Max $69,000',
-        },
-      ],
-    },
-  },
-
-  floridaSalesTax: {
-    content: `I've analyzed the transaction data for Florida Sales Tax liability. Here are my findings:
-
-**Key Determination:**
-While pure SaaS is generally exempt in Florida under recent guidance, the accompanying consulting services in this dataset are taxable.
-
-**Breakdown:**
-- **Software Subscriptions**: Exempt under § 212.05(1) - not tangible personal property
-- **Consulting Services**: Taxable at 6% state + 1% Miami-Dade surtax
-- **Implementation Fees**: Mixed treatment - review individual contracts
-
-**Miami-Dade County Surtax:**
-The current discretionary surtax rate is 1%, bringing total taxable rate to 7%.
-
-**Recommended Action:**
-Based on the Q4 transactions totaling $127,450 in consulting revenue, estimated sales tax liability is approximately **$8,921.50**.`,
-    citation: {
-      source: 'Florida Statute § 212.05(1)',
-      excerpt: 'There is hereby levied on each taxable transaction a privilege tax of 6 percent of the sales price of each item of tangible personal property...',
-      fullText: `Florida Statute § 212.05 - Sales, storage, use tax
-
-(1)(a) There is hereby levied on each taxable transaction or incident a tax of 6 percent of the sales price of each item or article of tangible personal property when sold at retail in this state, computed on each taxable sale for the purpose of remitting the amount of tax due the state.
-
-(b) Each occasional or isolated sale of tangible personal property, other than a sale which is exempt from the tax imposed by this chapter, is subject to the tax imposed by this section.
-
-**Computer Software Treatment:**
-Per Rule 12A-1.032, computer software delivered electronically is not considered tangible personal property and is exempt from sales tax. However, custom software development and consulting services remain taxable as the sale of a service rather than property.
-
-**Miami-Dade County Discretionary Surtax:**
-Pursuant to TIP 22B01-01, Miami-Dade County levies an additional 1% discretionary sales surtax on the first $5,000 of any single taxable transaction, bringing the combined rate to 7% for most business transactions.`,
-    },
-  },
-
-  default: {
-    content: `I can help you research tax questions for this client. Here are some areas I can assist with:
-
-- Deduction analysis and optimization
-- Credit eligibility review
-- Business expense categorization
-- Retirement contribution strategies
-- Entity structure considerations
-- State tax implications
-
-What specific aspect would you like me to research?`,
-  },
-};
-
-// =============================================================================
-// KEYWORD MATCHING
-// =============================================================================
-
-function selectMockResponse(message: string): MockResponseTemplate {
-  const lower = message.toLowerCase();
-
-  if (lower.includes('home office') || lower.includes('home-office') || lower.includes('280a')) {
-    return MOCK_RESPONSES.homeOffice;
+            if (data) {
+              try {
+                const event = JSON.parse(data) as StreamEvent;
+                yield event;
+              } catch {
+                // Skip malformed JSON
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
-
-  if (lower.includes('qbi') || lower.includes('199a') || lower.includes('qualified business income')) {
-    return MOCK_RESPONSES.qbi;
-  }
-
-  if (lower.includes('depreciat') || lower.includes('179') || lower.includes('macrs') || lower.includes('bonus')) {
-    return MOCK_RESPONSES.depreciation;
-  }
-
-  if (lower.includes('vehicle') || lower.includes('car') || lower.includes('mileage') || lower.includes('auto')) {
-    return MOCK_RESPONSES.vehicle;
-  }
-
-  if (lower.includes('dependent') || lower.includes('child') || lower.includes('ctc') || lower.includes('eitc')) {
-    return MOCK_RESPONSES.dependents;
-  }
-
-  if (lower.includes('income') || lower.includes('w-2') || lower.includes('w2') || lower.includes('1099') || lower.includes('k-1')) {
-    return MOCK_RESPONSES.income;
-  }
-
-  if (lower.includes('deduct') || lower.includes('itemiz') || lower.includes('standard')) {
-    return MOCK_RESPONSES.deduction;
-  }
-
-  if (lower.includes('retire') || lower.includes('401k') || lower.includes('sep') || lower.includes('ira') || lower.includes('pension')) {
-    return MOCK_RESPONSES.retirement;
-  }
-
-  if (lower.includes('florida') || lower.includes('sales tax') || lower.includes('saas') || lower.includes('212.05') || lower.includes('miami')) {
-    return MOCK_RESPONSES.floridaSalesTax;
-  }
-
-  return MOCK_RESPONSES.default;
 }
 
 // =============================================================================
-// MOCK CHAT SERVICE
+// MOCK CHAT SERVICE (for development/fallback)
 // =============================================================================
 
 const MOCK_DELAY_MS = 1500;
 
 class MockChatService implements ChatService {
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
-    // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
-
-    // Select response based on message content
-    const template = selectMockResponse(request.message);
 
     return {
       id: generateMessageId(),
-      content: template.content,
+      content: `I can help you research tax questions for "${request.message}". The RAG API is not connected - using mock response.`,
       timestamp: getCurrentTimestamp(),
-      citation: template.citation,
-      comparison: template.comparison,
     };
   }
+
+  async *streamMessage(request: ChatRequest): AsyncGenerator<StreamEvent> {
+    // Simulate streaming with mock events
+    yield { type: 'status', message: 'Starting query...' };
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    yield { type: 'reasoning', step: 1, node: 'query_analysis', description: 'Analyzing query intent' };
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    yield { type: 'reasoning', step: 2, node: 'knowledge_retrieval', description: 'Searching knowledge graph' };
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    yield { type: 'chunk', chunks: [{ chunkId: 'mock-1', citation: 'Mock Citation', relevanceScore: 0.95 }] };
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const mockAnswer = `I can help you research tax questions for "${request.message}". The RAG API is not connected - using mock streaming response.`;
+
+    // Stream answer in chunks
+    const words = mockAnswer.split(' ');
+    for (let i = 0; i < words.length; i += 3) {
+      const chunk = words.slice(i, i + 3).join(' ') + ' ';
+      yield { type: 'answer', content: chunk };
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    yield {
+      type: 'complete',
+      metadata: {
+        requestId: 'mock-' + Date.now(),
+        confidence: 0.85,
+        processingTimeMs: 2000,
+        citationCount: 1,
+        sourceCount: 1,
+      },
+    };
+  }
+}
+
+// =============================================================================
+// SERVICE FACTORY
+// =============================================================================
+
+function createChatService(): ChatService {
+  // Use real service by default, fall back to mock if needed
+  // The real service will fail gracefully if the API is unavailable
+  return new RealChatService();
 }
 
 // =============================================================================
 // EXPORT SINGLETON
 // =============================================================================
 
-// To switch to real API later, change this to:
-// export const chatService: ChatService = new RealChatService({ baseUrl: process.env.NEXT_PUBLIC_API_URL });
-export const chatService: ChatService = new MockChatService();
+export const chatService: ChatService = createChatService();
+
+// Export mock service for testing
+export const mockChatService: ChatService = new MockChatService();

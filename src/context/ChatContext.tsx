@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import type { ChatState, ChatAction, Client, ChatThread, Message, Document, DocumentType, Task, Citation } from '@/types/chat';
+import type { ChatState, ChatAction, Client, ChatThread, Message, Document, DocumentType, Task, Citation, ReasoningStep, SourceChip } from '@/types/chat';
 import { chatService } from '@/services/chatService';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import {
@@ -37,7 +37,16 @@ const initialState: ChatState = {
   inputValue: '',
   isLoading: false,
   isTyping: false,
+  isInitialLoading: true,
+  initialLoadError: null,
   attachedFile: null,
+  isUploading: false,
+  uploadError: null,
+  streamingContent: '',
+  reasoningSteps: [],
+  pendingSources: [],
+  streamStatus: '',
+  streamError: null,
   clientDropdownOpen: false,
   viewingDocument: null,
   uploadModalOpen: false,
@@ -213,6 +222,20 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         attachedFile: action.payload,
+        uploadError: null, // Clear error when file changes
+      };
+
+    case 'SET_IS_UPLOADING':
+      return {
+        ...state,
+        isUploading: action.payload,
+      };
+
+    case 'SET_UPLOAD_ERROR':
+      return {
+        ...state,
+        uploadError: action.payload,
+        isUploading: false,
       };
 
     // Citation modal
@@ -220,6 +243,117 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         viewingCitation: action.payload,
+      };
+
+    // Streaming actions
+    case 'START_STREAMING':
+      return {
+        ...state,
+        isTyping: true,
+        streamingContent: '',
+        reasoningSteps: [],
+        pendingSources: [],
+        streamStatus: 'Starting...',
+        streamError: null,
+      };
+
+    case 'STREAM_STATUS':
+      return {
+        ...state,
+        streamStatus: action.payload,
+      };
+
+    case 'STREAM_CONTENT':
+      return {
+        ...state,
+        streamingContent: state.streamingContent + action.payload,
+      };
+
+    case 'ADD_REASONING_STEP':
+      return {
+        ...state,
+        reasoningSteps: [...state.reasoningSteps, action.payload],
+      };
+
+    case 'ADD_PENDING_SOURCES':
+      return {
+        ...state,
+        pendingSources: [...state.pendingSources, ...action.payload],
+      };
+
+    case 'FINALIZE_MESSAGE': {
+      const { threadId, message } = action.payload;
+      return {
+        ...state,
+        messagesByThread: {
+          ...state.messagesByThread,
+          [threadId]: [...(state.messagesByThread[threadId] || []), message],
+        },
+        isTyping: false,
+        streamingContent: '',
+        reasoningSteps: [],
+        pendingSources: [],
+        streamStatus: '',
+      };
+    }
+
+    case 'STREAM_ERROR':
+      return {
+        ...state,
+        isTyping: false,
+        streamError: action.payload,
+        streamStatus: '',
+      };
+
+    case 'CLEAR_STREAMING':
+      return {
+        ...state,
+        streamingContent: '',
+        reasoningSteps: [],
+        pendingSources: [],
+        streamStatus: '',
+        streamError: null,
+      };
+
+    // Data loading
+    case 'SET_CLIENTS':
+      return {
+        ...state,
+        clients: action.payload,
+      };
+
+    case 'SET_THREADS':
+      return {
+        ...state,
+        threads: action.payload,
+      };
+
+    case 'SET_INITIAL_LOADING':
+      return {
+        ...state,
+        isInitialLoading: action.payload,
+      };
+
+    case 'SET_INITIAL_LOAD_ERROR':
+      return {
+        ...state,
+        initialLoadError: action.payload,
+        isInitialLoading: false,
+      };
+
+    case 'INITIAL_DATA_LOADED':
+      return {
+        ...state,
+        clients: action.payload.clients.length > 0 ? action.payload.clients : state.clients,
+        threads: action.payload.threads.length > 0 ? action.payload.threads : state.threads,
+        selectedClientId: action.payload.clients.length > 0
+          ? action.payload.clients[0].id
+          : state.selectedClientId,
+        activeThreadId: action.payload.threads.length > 0
+          ? action.payload.threads[0].id
+          : state.activeThreadId,
+        isInitialLoading: false,
+        initialLoadError: null,
       };
 
     default:
@@ -239,6 +373,9 @@ interface ChatContextValue extends ChatState {
   selectedTask: Task | null;
   inProgressTasks: Task[];
   readyTasks: Task[];
+
+  // Streaming state (exposed for UI)
+  isStreaming: boolean;
 
   // Actions
   selectClient: (clientId: string) => void;
@@ -261,8 +398,11 @@ interface ChatContextValue extends ChatState {
   advanceTaskStep: (taskId: string) => void;
   completeTask: (taskId: string) => void;
 
-  // File attachment
-  setAttachedFile: (file: { name: string; size: number } | null) => void;
+  // File attachment and upload
+  setAttachedFile: (file: { name: string; size: number; file: File; type: DocumentType } | null) => void;
+  uploadFile: (file: File, type: DocumentType) => Promise<string | null>;
+  isUploading: boolean;
+  uploadError: string | null;
 
   // Citation modal
   openCitation: (citation: Citation) => void;
@@ -328,6 +468,68 @@ export function ChatProvider({ children }: ChatProviderProps) {
     });
   }, [state.threads, state.messagesByThread, state.selectedClientId, state.activeThreadId, state.clients, setPersistedState]);
 
+  // Load initial data from API
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        dispatch({ type: 'SET_INITIAL_LOADING', payload: true });
+
+        // Fetch clients and threads in parallel
+        const [clientsRes, threadsRes] = await Promise.all([
+          fetch('/api/clients'),
+          fetch('/api/threads'),
+        ]);
+
+        // If not authenticated, both will fail - that's handled by middleware
+        if (!clientsRes.ok && clientsRes.status === 401) {
+          // User not authenticated, skip API loading (will use mock data)
+          dispatch({ type: 'SET_INITIAL_LOADING', payload: false });
+          return;
+        }
+
+        const [clientsData, threadsData] = await Promise.all([
+          clientsRes.ok ? clientsRes.json() : { data: [] },
+          threadsRes.ok ? threadsRes.json() : { data: [] },
+        ]);
+
+        // Transform database format to frontend format
+        const transformedClients: Client[] = (clientsData.data || []).map((c: Record<string, unknown>) => ({
+          id: c.id as string,
+          name: c.name as string,
+          state: c.state as string,
+          taxYear: c.tax_year as number,
+          filingStatus: c.filing_status as string,
+          ssn: `***-**-${c.ssn_last_four || '****'}`,
+          grossIncome: c.gross_income as number || 0,
+          schedCRevenue: c.sched_c_revenue as number || 0,
+          dependents: c.dependents as number || 0,
+          documents: [], // Documents loaded separately
+        }));
+
+        const transformedThreads: ChatThread[] = (threadsData.data || []).map((t: Record<string, unknown>) => ({
+          id: t.id as string,
+          clientId: t.client_id as string,
+          title: t.title as string,
+          timestamp: getRelativeTimestamp(new Date(t.updated_at as string)),
+        }));
+
+        dispatch({
+          type: 'INITIAL_DATA_LOADED',
+          payload: { clients: transformedClients, threads: transformedThreads },
+        });
+      } catch (error) {
+        console.error('Failed to load initial data:', error);
+        // On error, keep using mock data
+        dispatch({
+          type: 'SET_INITIAL_LOAD_ERROR',
+          payload: error instanceof Error ? error.message : 'Failed to load data',
+        });
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
   // =============================================================================
   // DERIVED STATE
   // =============================================================================
@@ -348,6 +550,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   const inProgressTasks = state.tasks.filter((t) => t.status === 'in_progress');
   const readyTasks = state.tasks.filter((t) => t.status === 'ready');
+
+  // Streaming state - check if we're actively streaming content
+  const isStreaming = state.isTyping && (state.streamingContent.length > 0 || state.reasoningSteps.length > 0);
 
   // =============================================================================
   // ACTIONS
@@ -416,15 +621,19 @@ export function ChatProvider({ children }: ChatProviderProps) {
         payload: { threadId, timestamp: getRelativeTimestamp(new Date()) },
       });
 
-      // Clear input
+      // Clear input and attached file
       dispatch({ type: 'SET_INPUT_VALUE', payload: '' });
+      dispatch({ type: 'SET_ATTACHED_FILE', payload: null });
 
-      // Show typing indicator
-      dispatch({ type: 'SET_IS_TYPING', payload: true });
+      // Start streaming
+      dispatch({ type: 'START_STREAMING' });
 
       try {
-        // Call chat service
-        const response = await chatService.sendMessage({
+        let fullContent = '';
+        let citation: Citation | undefined;
+
+        // Use streaming API
+        for await (const event of chatService.streamMessage({
           message: content,
           clientId: state.selectedClientId,
           threadId,
@@ -433,28 +642,58 @@ export function ChatProvider({ children }: ChatProviderProps) {
             clientData: selectedClient,
             previousMessages: [...existingMessages, userMessage],
           },
-        });
+        })) {
+          switch (event.type) {
+            case 'status':
+              dispatch({ type: 'STREAM_STATUS', payload: event.message });
+              break;
 
-        // Create assistant message
-        const assistantMessage: Message = {
-          id: response.id,
-          role: 'assistant',
-          content: response.content,
-          timestamp: response.timestamp,
-          citation: response.citation,
-          comparison: response.comparison,
-        };
+            case 'reasoning':
+              dispatch({
+                type: 'ADD_REASONING_STEP',
+                payload: { step: event.step, node: event.node, description: event.description },
+              });
+              break;
 
-        // Add assistant message
-        dispatch({
-          type: 'ADD_MESSAGE',
-          payload: { threadId, message: assistantMessage },
-        });
+            case 'chunk':
+              dispatch({ type: 'ADD_PENDING_SOURCES', payload: event.chunks });
+              // Use first chunk as citation if we have sources
+              if (event.chunks.length > 0 && !citation) {
+                citation = {
+                  source: event.chunks[0].citation,
+                  excerpt: 'View source for full details',
+                };
+              }
+              break;
+
+            case 'answer':
+              fullContent += event.content;
+              dispatch({ type: 'STREAM_CONTENT', payload: event.content });
+              break;
+
+            case 'complete':
+              // Finalize the message
+              const assistantMessage: Message = {
+                id: `msg-${Date.now()}`,
+                role: 'assistant',
+                content: fullContent,
+                timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+                citation,
+              };
+              dispatch({
+                type: 'FINALIZE_MESSAGE',
+                payload: { threadId: threadId!, message: assistantMessage },
+              });
+              break;
+
+            case 'error':
+              dispatch({ type: 'STREAM_ERROR', payload: event.message });
+              break;
+          }
+        }
       } catch (error) {
         console.error('Failed to send message:', error);
-        // Could add error handling UI here
-      } finally {
-        dispatch({ type: 'SET_IS_TYPING', payload: false });
+        dispatch({ type: 'STREAM_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
       }
     },
     [
@@ -523,9 +762,54 @@ export function ChatProvider({ children }: ChatProviderProps) {
   // FILE ATTACHMENT ACTIONS
   // =============================================================================
 
-  const setAttachedFile = useCallback((file: { name: string; size: number } | null) => {
+  const setAttachedFile = useCallback((file: { name: string; size: number; file: File; type: DocumentType } | null) => {
     dispatch({ type: 'SET_ATTACHED_FILE', payload: file });
   }, []);
+
+  const uploadFile = useCallback(async (file: File, type: DocumentType): Promise<string | null> => {
+    if (!selectedClient) {
+      dispatch({ type: 'SET_UPLOAD_ERROR', payload: 'No client selected' });
+      return null;
+    }
+
+    dispatch({ type: 'SET_IS_UPLOADING', payload: true });
+    dispatch({ type: 'SET_UPLOAD_ERROR', payload: null });
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('clientId', selectedClient.id);
+      formData.append('name', file.name);
+      formData.append('type', type);
+
+      const response = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Upload failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      dispatch({ type: 'SET_IS_UPLOADING', payload: false });
+
+      // Add document to client's documents list
+      if (data.document) {
+        dispatch({
+          type: 'ADD_DOCUMENT',
+          payload: { clientId: selectedClient.id, document: data.document },
+        });
+      }
+
+      return data.document?.id || null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Upload failed';
+      dispatch({ type: 'SET_UPLOAD_ERROR', payload: message });
+      return null;
+    }
+  }, [selectedClient]);
 
   // =============================================================================
   // CITATION MODAL ACTIONS
@@ -551,6 +835,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     selectedTask,
     inProgressTasks,
     readyTasks,
+    isStreaming,
     selectClient,
     setClientDropdownOpen,
     selectThread,
@@ -567,6 +852,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
     advanceTaskStep,
     completeTask,
     setAttachedFile,
+    uploadFile,
+    isUploading: state.isUploading,
+    uploadError: state.uploadError,
     openCitation,
     closeCitation,
   };

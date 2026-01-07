@@ -103,6 +103,38 @@ export interface ChatResponse {
 }
 
 // =============================================================================
+// STREAMING TYPES
+// =============================================================================
+
+export interface ReasoningStep {
+  step: number;
+  node: string;
+  description: string;
+}
+
+export interface SourceChip {
+  chunkId: string;
+  citation: string;
+  relevanceScore: number;
+}
+
+export interface StreamMetadata {
+  requestId: string;
+  confidence: number;
+  processingTimeMs: number;
+  citationCount: number;
+  sourceCount: number;
+}
+
+export type StreamEvent =
+  | { type: 'status'; message: string }
+  | { type: 'reasoning'; step: number; node: string; description: string }
+  | { type: 'chunk'; chunks: SourceChip[] }
+  | { type: 'answer'; content: string }
+  | { type: 'complete'; metadata: StreamMetadata }
+  | { type: 'error'; error: string; message: string };
+
+// =============================================================================
 // STATE TYPES
 // =============================================================================
 
@@ -126,7 +158,18 @@ export interface ChatState {
   inputValue: string;
   isLoading: boolean;
   isTyping: boolean;
-  attachedFile: { name: string; size: number } | null;
+  isInitialLoading: boolean;
+  initialLoadError: string | null;
+  attachedFile: { name: string; size: number; file: File; type: DocumentType } | null;
+  isUploading: boolean;
+  uploadError: string | null;
+
+  // Streaming state
+  streamingContent: string;
+  reasoningSteps: ReasoningStep[];
+  pendingSources: SourceChip[];
+  streamStatus: string;
+  streamError: string | null;
 
   // Dropdown states
   clientDropdownOpen: boolean;
@@ -159,7 +202,24 @@ export type ChatAction =
   | { type: 'SET_SELECTED_TASK'; payload: string | null }
   | { type: 'ADVANCE_TASK_STEP'; payload: string }
   | { type: 'COMPLETE_TASK'; payload: string }
-  // File attachment
-  | { type: 'SET_ATTACHED_FILE'; payload: { name: string; size: number } | null }
+  // File attachment and upload
+  | { type: 'SET_ATTACHED_FILE'; payload: { name: string; size: number; file: File; type: DocumentType } | null }
+  | { type: 'SET_IS_UPLOADING'; payload: boolean }
+  | { type: 'SET_UPLOAD_ERROR'; payload: string | null }
   // Citation modal
-  | { type: 'SET_VIEWING_CITATION'; payload: Citation | null };
+  | { type: 'SET_VIEWING_CITATION'; payload: Citation | null }
+  // Streaming actions
+  | { type: 'START_STREAMING' }
+  | { type: 'STREAM_STATUS'; payload: string }
+  | { type: 'STREAM_CONTENT'; payload: string }
+  | { type: 'ADD_REASONING_STEP'; payload: ReasoningStep }
+  | { type: 'ADD_PENDING_SOURCES'; payload: SourceChip[] }
+  | { type: 'FINALIZE_MESSAGE'; payload: { threadId: string; message: Message } }
+  | { type: 'STREAM_ERROR'; payload: string }
+  | { type: 'CLEAR_STREAMING' }
+  // Data loading
+  | { type: 'SET_CLIENTS'; payload: Client[] }
+  | { type: 'SET_THREADS'; payload: ChatThread[] }
+  | { type: 'SET_INITIAL_LOADING'; payload: boolean }
+  | { type: 'SET_INITIAL_LOAD_ERROR'; payload: string | null }
+  | { type: 'INITIAL_DATA_LOADED'; payload: { clients: Client[]; threads: ChatThread[] } };

@@ -5,12 +5,25 @@ import { useChat } from '@/context/ChatContext';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { ComparisonCard } from './ComparisonCard';
 import { TypingIndicator } from './TypingIndicator';
+import StreamingMessage from './StreamingMessage';
+import ReasoningSteps from './ReasoningSteps';
+import SourceChips from './SourceChips';
 
 export function MessageList() {
-  const { activeMessages, isTyping, openCitation } = useChat();
+  const {
+    activeMessages,
+    isTyping,
+    isStreaming,
+    streamingContent,
+    reasoningSteps,
+    pendingSources,
+    streamStatus,
+    streamError,
+    openCitation,
+  } = useChat();
 
   const { containerRef, handleScroll, scrollToBottom } = useAutoScroll<HTMLDivElement>(
-    [activeMessages.length, isTyping],
+    [activeMessages.length, isTyping, streamingContent],
     { threshold: 150 }
   );
 
@@ -116,8 +129,39 @@ export function MessageList() {
           </div>
         ))}
 
-        {/* Typing Indicator */}
-        {isTyping && <TypingIndicator />}
+        {/* Streaming Content */}
+        {isTyping && (
+          <div className="space-y-4">
+            {/* Reasoning Steps */}
+            {reasoningSteps.length > 0 && (
+              <ReasoningSteps steps={reasoningSteps} isStreaming={!streamingContent} />
+            )}
+
+            {/* Source Chips */}
+            {pendingSources.length > 0 && (
+              <SourceChips sources={pendingSources} />
+            )}
+
+            {/* Streaming Message or Typing Indicator */}
+            {streamingContent ? (
+              <StreamingMessage
+                content={streamingContent}
+                status={streamStatus}
+                isComplete={false}
+              />
+            ) : (
+              <TypingIndicator />
+            )}
+
+            {/* Stream Error */}
+            {streamError && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-md p-4 text-sm text-red-400">
+                <div className="font-medium mb-1">Error</div>
+                <div>{streamError}</div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
