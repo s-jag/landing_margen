@@ -82,6 +82,7 @@ src/
 │   ├── auth/             # Auth server actions
 │   ├── supabase/         # Supabase client utilities
 │   ├── constants.ts      # App constants
+│   ├── rateLimit.ts      # API rate limiting utility
 │   └── utils.ts          # Utility functions
 ├── services/
 │   ├── chatService.ts    # Chat API (sync & streaming)
@@ -100,6 +101,23 @@ src/
 
 ### Authentication
 All API routes require authentication via Supabase Auth session cookies.
+
+### Rate Limiting
+
+API endpoints are rate limited to prevent abuse:
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| `/api/query`, `/api/query/stream` | 20 requests | 1 minute |
+| `/api/clients`, `/api/threads` | 60 requests | 1 minute |
+| `/api/documents/upload` | 10 requests | 5 minutes |
+
+Rate limit headers are included in all responses:
+- `X-RateLimit-Limit` - Maximum requests allowed
+- `X-RateLimit-Remaining` - Requests remaining in window
+- `X-RateLimit-Reset` - Unix timestamp when window resets
+
+When rate limited, the API returns `429 Too Many Requests` with a `Retry-After` header.
 
 ### Clients
 
@@ -206,6 +224,23 @@ src/app/chat/components/
 - **Complete tax code understanding** - Semantic search across IRC sections
 - **Multi-model support** - Access to Claude, GPT-4, Gemini, and more
 - **Enterprise ready** - Secure, scalable architecture for accounting firms
+
+## Security
+
+### Authentication & Authorization
+- All API routes require Supabase Auth session cookies
+- Row Level Security (RLS) policies enforce data isolation between organizations
+- Users can only access clients and threads belonging to their organization
+
+### Rate Limiting
+- In-memory sliding window rate limiting on all API endpoints
+- Per-user + IP-based identification
+- Configurable limits for different endpoint types (see API Reference)
+
+### Test Endpoints
+Test endpoints (`/api/test-*`) are available for development but **blocked in production**:
+- Return `404 NOT_FOUND` when `NODE_ENV=production`
+- Production apps should use authenticated endpoints only
 
 ## Environment Variables
 
