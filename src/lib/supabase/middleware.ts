@@ -43,14 +43,22 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Define protected and auth routes
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/signup') ||
-    request.nextUrl.pathname.startsWith('/forgot-password');
+  // Define route types
+  const pathname = request.nextUrl.pathname;
 
-  const isProtectedRoute = request.nextUrl.pathname.startsWith('/chat') ||
-    request.nextUrl.pathname.startsWith('/settings') ||
-    request.nextUrl.pathname.startsWith('/clients');
+  // Routes that require authentication
+  const isProtectedRoute = pathname.startsWith('/chat') ||
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/clients');
+
+  // Routes accessible to authenticated users (but don't require auth)
+  const isAllowedForAuth = pathname.startsWith('/waitlist');
+
+  const isApiRoute = pathname.startsWith('/api');
+
+  const isStaticAsset = pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon') ||
+    pathname.includes('.');
 
   // Redirect unauthenticated users from protected routes to login
   if (!user && isProtectedRoute) {
@@ -60,12 +68,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users from auth routes to chat
-  if (user && isAuthRoute) {
+  // Redirect authenticated users to /chat from any non-allowed page
+  // (except API routes and static assets)
+  if (user && !isProtectedRoute && !isAllowedForAuth && !isApiRoute && !isStaticAsset) {
     const url = request.nextUrl.clone();
-    const redirect = request.nextUrl.searchParams.get('redirect');
-    url.pathname = redirect || '/chat';
-    url.searchParams.delete('redirect');
+    url.pathname = '/chat';
     return NextResponse.redirect(url);
   }
 

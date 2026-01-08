@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 
 const NAV_LINKS = [
   { label: 'Features', href: '/features' },
@@ -13,6 +14,7 @@ const NAV_LINKS = [
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAuthenticated, isLoading, signOut } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-bg">
@@ -39,12 +41,23 @@ export function Header() {
 
           {/* CTAs */}
           <div className="hidden md:flex items-center gap-g1">
-            <Link
-              href="/login"
-              className="px-g1.5 py-1 text-sm text-text-secondary hover:text-text transition-colors"
-            >
-              Sign in
-            </Link>
+            {!isLoading && (
+              isAuthenticated ? (
+                <button
+                  onClick={() => signOut()}
+                  className="px-g1.5 py-1 text-sm text-text-secondary hover:text-text transition-colors"
+                >
+                  Sign out
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="px-g1.5 py-1 text-sm text-text-secondary hover:text-text transition-colors"
+                >
+                  Sign in
+                </Link>
+              )
+            )}
             <Link href="/chat" className="btn-secondary">
               Try the research assistant
             </Link>
@@ -80,9 +93,22 @@ export function Header() {
             </Link>
           ))}
           <div className="mt-v1 pt-v1 border-t border-border-01 flex flex-col gap-2">
-            <Link href="/login" className="text-sm text-text-secondary">Sign in</Link>
-            <Link href="/chat" className="btn-secondary w-full justify-center">Try the demo</Link>
-            <Link href="/waitlist" className="btn-accent w-full justify-center">Join waitlist</Link>
+            {!isLoading && (
+              isAuthenticated ? (
+                <button
+                  onClick={() => { signOut(); setMobileMenuOpen(false); }}
+                  className="text-sm text-text-secondary text-left"
+                >
+                  Sign out
+                </button>
+              ) : (
+                <Link href="/login" className="text-sm text-text-secondary" onClick={() => setMobileMenuOpen(false)}>
+                  Sign in
+                </Link>
+              )
+            )}
+            <Link href="/chat" className="btn-secondary w-full justify-center" onClick={() => setMobileMenuOpen(false)}>Try the demo</Link>
+            <Link href="/waitlist" className="btn-accent w-full justify-center" onClick={() => setMobileMenuOpen(false)}>Join waitlist</Link>
           </div>
         </div>
       )}
