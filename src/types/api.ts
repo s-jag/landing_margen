@@ -285,3 +285,26 @@ export interface HealthResponse {
   services: ServiceHealth[];
   timestamp: string;
 }
+
+// =============================================================================
+// CONTACT SCHEMAS & TYPES
+// =============================================================================
+
+export const contactSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  email: z.string().email('Invalid email address'),
+  message: z.string().min(10, 'Message must be at least 10 characters').max(2000),
+});
+
+export type ContactRequest = z.infer<typeof contactSchema>;
+
+// =============================================================================
+// WAITLIST SCHEMAS & TYPES
+// =============================================================================
+
+export const waitlistSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  name: z.string().min(1, 'Name is required').max(100),
+});
+
+export type WaitlistRequest = z.infer<typeof waitlistSchema>;

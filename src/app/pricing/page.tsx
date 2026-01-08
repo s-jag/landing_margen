@@ -4,58 +4,67 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Header, Footer } from '@/components/layout';
 
-const PRICING_TIERS = [
+const PRODUCTS = [
   {
-    name: 'Starter',
-    description: 'For individual preparers getting started',
+    name: 'Research Assistant',
+    tagline: 'AI-powered tax research',
+    description: 'State-specific insights and citations for tax professionals',
     monthlyPrice: 29,
     annualPrice: 24,
+    perSeat: false,
     features: [
-      'Single user',
-      'Basic tax research (100 queries/mo)',
-      'Document storage (5GB)',
+      'Unlimited tax research queries',
+      'State-specific guidance (all 50 states)',
+      'IRS code & regulation search',
+      'Case law citations',
+      'Real-time tax law updates',
       'Email support',
-      'Standard response time',
     ],
     cta: 'Start free trial',
+    ctaHref: '/chat',
     ctaStyle: 'secondary',
     popular: false,
   },
   {
-    name: 'Professional',
-    description: 'For growing firms that need the full suite',
+    name: 'Practice Platform',
+    tagline: 'Complete client management',
+    description: 'AI agents, document processing, and context-aware recommendations',
     monthlyPrice: 99,
     annualPrice: 79,
     perSeat: true,
     features: [
-      'Everything in Starter',
-      'Unlimited tax research',
-      'Full CRM functionality',
+      'Everything in Research Assistant',
+      'Full CRM & client management',
       'AI agent workflows',
+      'Document processing & retrieval',
       'Client portal',
-      'Priority support',
+      'Context-aware recommendations',
       'Team collaboration',
+      'Priority support',
     ],
-    cta: 'Get started',
+    cta: 'Join waitlist',
+    ctaHref: '/waitlist',
     ctaStyle: 'primary',
     popular: true,
   },
   {
-    name: 'Enterprise',
-    description: 'For large firms with custom needs',
+    name: 'E-filing Suite',
+    tagline: 'Complete e-filing solution',
+    description: 'Federal and state e-filing with full compliance tracking',
     monthlyPrice: null,
     annualPrice: null,
+    perSeat: false,
     features: [
-      'Everything in Professional',
-      'Custom integrations',
-      'SSO / SAML',
-      'Dedicated success manager',
-      'SLA guarantees',
-      'On-premise deployment',
-      'Custom training',
-      'Audit compliance tools',
+      'Everything in Practice Platform',
+      'Federal e-filing',
+      'State e-filing (all 50 states)',
+      'IRS status tracking',
+      'Automated acknowledgments',
+      'Rejection handling & resubmission',
+      'Audit trail & compliance',
     ],
     cta: 'Contact sales',
+    ctaHref: '/contact',
     ctaStyle: 'secondary',
     popular: false,
   },
@@ -89,20 +98,21 @@ const FAQS = [
 ];
 
 const COMPARISON_FEATURES = [
-  { name: 'Users', starter: '1', professional: 'Unlimited', enterprise: 'Unlimited' },
-  { name: 'Tax research queries', starter: '100/mo', professional: 'Unlimited', enterprise: 'Unlimited' },
-  { name: 'Document storage', starter: '5 GB', professional: '100 GB', enterprise: 'Unlimited' },
-  { name: 'CRM & client management', starter: false, professional: true, enterprise: true },
-  { name: 'AI agent workflows', starter: false, professional: true, enterprise: true },
-  { name: 'Client portal', starter: false, professional: true, enterprise: true },
-  { name: 'E-filing integration', starter: false, professional: true, enterprise: true },
-  { name: 'Team collaboration', starter: false, professional: true, enterprise: true },
-  { name: 'Priority support', starter: false, professional: true, enterprise: true },
-  { name: 'Custom integrations', starter: false, professional: false, enterprise: true },
-  { name: 'SSO / SAML', starter: false, professional: false, enterprise: true },
-  { name: 'Dedicated success manager', starter: false, professional: false, enterprise: true },
-  { name: 'SLA guarantees', starter: false, professional: false, enterprise: true },
-  { name: 'On-premise deployment', starter: false, professional: false, enterprise: true },
+  { name: 'Tax research queries', research: 'Unlimited', platform: 'Unlimited', efiling: 'Unlimited' },
+  { name: 'State-specific guidance', research: 'All 50 states', platform: 'All 50 states', efiling: 'All 50 states' },
+  { name: 'Case law citations', research: true, platform: true, efiling: true },
+  { name: 'Real-time tax law updates', research: true, platform: true, efiling: true },
+  { name: 'CRM & client management', research: false, platform: true, efiling: true },
+  { name: 'AI agent workflows', research: false, platform: true, efiling: true },
+  { name: 'Document processing', research: false, platform: true, efiling: true },
+  { name: 'Client portal', research: false, platform: true, efiling: true },
+  { name: 'Context-aware recommendations', research: false, platform: true, efiling: true },
+  { name: 'Team collaboration', research: false, platform: true, efiling: true },
+  { name: 'Federal e-filing', research: false, platform: false, efiling: true },
+  { name: 'State e-filing', research: false, platform: false, efiling: 'All 50 states' },
+  { name: 'IRS status tracking', research: false, platform: false, efiling: true },
+  { name: 'Compliance & audit trail', research: false, platform: false, efiling: true },
+  { name: 'Priority support', research: false, platform: true, efiling: true },
 ];
 
 export default function PricingPage() {
@@ -118,10 +128,10 @@ export default function PricingPage() {
           <div className="mx-auto max-w-container">
             <div className="max-w-2xl mx-auto text-center">
               <h1 className="text-xl md:text-2xl text-text mb-v0.5">
-                Simple, transparent pricing
+                Choose your Margen experience
               </h1>
               <p className="text-md text-text-secondary">
-                Start free. Upgrade as you grow.
+                From AI research to complete practice management and e-filing.
               </p>
             </div>
           </div>
@@ -159,7 +169,7 @@ export default function PricingPage() {
         <section className="pb-v4 px-g2">
           <div className="mx-auto max-w-container">
             <div className="grid md:grid-cols-3 gap-g1">
-              {PRICING_TIERS.map((tier) => (
+              {PRODUCTS.map((tier) => (
                 <div
                   key={tier.name}
                   className={`card flex flex-col p-6 relative ${
@@ -173,6 +183,7 @@ export default function PricingPage() {
                   )}
 
                   <div className="mb-6">
+                    <div className="text-xs text-accent uppercase tracking-wider mb-1">{tier.tagline}</div>
                     <h3 className="text-lg text-text mb-1">{tier.name}</h3>
                     <p className="text-sm text-text-secondary">{tier.description}</p>
                   </div>
@@ -209,7 +220,7 @@ export default function PricingPage() {
                   </ul>
 
                   <Link
-                    href={tier.name === 'Enterprise' ? '/enterprise' : '/chat'}
+                    href={tier.ctaHref}
                     className={tier.ctaStyle === 'primary' ? 'btn-accent w-full justify-center' : 'btn-secondary w-full justify-center'}
                   >
                     {tier.cta}
@@ -223,7 +234,7 @@ export default function PricingPage() {
         {/* Feature Comparison */}
         <section className="py-v4 px-g2 bg-card">
           <div className="mx-auto max-w-container">
-            <h2 className="text-xl text-text mb-v2 text-center">Compare plans</h2>
+            <h2 className="text-xl text-text mb-v2 text-center">Compare products</h2>
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[600px]">
@@ -233,13 +244,13 @@ export default function PricingPage() {
                       Feature
                     </th>
                     <th className="text-center text-sm text-text font-normal py-4 px-4 w-32">
-                      Starter
+                      Research
                     </th>
                     <th className="text-center text-sm text-text font-normal py-4 px-4 w-32 bg-accent/5">
-                      Professional
+                      Platform
                     </th>
                     <th className="text-center text-sm text-text font-normal py-4 pl-4 w-32">
-                      Enterprise
+                      E-filing
                     </th>
                   </tr>
                 </thead>
@@ -250,36 +261,36 @@ export default function PricingPage() {
                         {feature.name}
                       </td>
                       <td className="text-center text-sm py-4 px-4">
-                        {typeof feature.starter === 'boolean' ? (
-                          feature.starter ? (
+                        {typeof feature.research === 'boolean' ? (
+                          feature.research ? (
                             <span className="text-ansi-green">✓</span>
                           ) : (
                             <span className="text-text-tertiary">—</span>
                           )
                         ) : (
-                          <span className="text-text-secondary">{feature.starter}</span>
+                          <span className="text-text-secondary">{feature.research}</span>
                         )}
                       </td>
                       <td className="text-center text-sm py-4 px-4 bg-accent/5">
-                        {typeof feature.professional === 'boolean' ? (
-                          feature.professional ? (
+                        {typeof feature.platform === 'boolean' ? (
+                          feature.platform ? (
                             <span className="text-ansi-green">✓</span>
                           ) : (
                             <span className="text-text-tertiary">—</span>
                           )
                         ) : (
-                          <span className="text-text-secondary">{feature.professional}</span>
+                          <span className="text-text-secondary">{feature.platform}</span>
                         )}
                       </td>
                       <td className="text-center text-sm py-4 pl-4">
-                        {typeof feature.enterprise === 'boolean' ? (
-                          feature.enterprise ? (
+                        {typeof feature.efiling === 'boolean' ? (
+                          feature.efiling ? (
                             <span className="text-ansi-green">✓</span>
                           ) : (
                             <span className="text-text-tertiary">—</span>
                           )
                         ) : (
-                          <span className="text-text-secondary">{feature.enterprise}</span>
+                          <span className="text-text-secondary">{feature.efiling}</span>
                         )}
                       </td>
                     </tr>
@@ -323,16 +334,16 @@ export default function PricingPage() {
         {/* CTA */}
         <section className="py-v4 px-g2 bg-card">
           <div className="mx-auto max-w-container text-center">
-            <h2 className="text-lg text-text mb-v0.5">Ready to get started?</h2>
+            <h2 className="text-lg text-text mb-v0.5">Not sure which is right for you?</h2>
             <p className="text-base text-text-secondary mb-v1">
-              Join hundreds of tax professionals using Margen to work faster.
+              Start with Research Assistant free for 14 days, or talk to us about your needs.
             </p>
             <div className="flex items-center justify-center gap-4">
               <Link href="/chat" className="btn-accent">
                 Start free trial
               </Link>
-              <Link href="/enterprise" className="btn-secondary">
-                Contact sales
+              <Link href="/contact" className="btn-secondary">
+                Talk to sales
               </Link>
             </div>
           </div>

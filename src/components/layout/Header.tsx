@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { label: 'Enterprise', href: '/enterprise' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'Resources', href: '/resources' },
+  { label: 'Contact', href: '/contact' },
 ];
 
 export function Header() {
@@ -47,6 +48,9 @@ export function Header() {
             <Link href="/chat" className="btn-secondary">
               Try the research assistant
             </Link>
+            <Link href="/waitlist" className="btn-accent">
+              Discover the full platform
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -77,7 +81,8 @@ export function Header() {
           ))}
           <div className="mt-v1 pt-v1 border-t border-border-01 flex flex-col gap-2">
             <Link href="/login" className="text-sm text-text-secondary">Sign in</Link>
-            <Link href="/download" className="btn w-full justify-center">Download</Link>
+            <Link href="/chat" className="btn-secondary w-full justify-center">Try the demo</Link>
+            <Link href="/waitlist" className="btn-accent w-full justify-center">Join waitlist</Link>
           </div>
         </div>
       )}

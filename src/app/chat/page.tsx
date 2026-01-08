@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChatProvider, useChat } from '@/context/ChatContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useDocumentExtraction } from '@/hooks/useDocumentExtraction';
 import { getStateBadgeColor, formatCurrency, getDocIcon } from '@/lib/chatUtils';
 import {
   CitationModal,
@@ -22,7 +23,36 @@ import {
 // =============================================================================
 
 function RightSidebar() {
-  const { selectedClient, openDocumentViewer, openUploadModal } = useChat();
+  const { selectedClient, openDocumentViewer, openUploadModal, refreshClients } = useChat();
+  const { extractDocument, aggregateExtractions, isExtracting, getError, aggregating } = useDocumentExtraction();
+
+  // Check if a document is a PDF (can be extracted)
+  const isPDF = (doc: { name: string; mimeType?: string }) => {
+    return doc.mimeType === 'application/pdf' || doc.name.toLowerCase().endsWith('.pdf');
+  };
+
+  // Handle extraction for a single document
+  const handleExtract = async (e: React.MouseEvent, docId: string) => {
+    e.stopPropagation(); // Don't open the document viewer
+    const result = await extractDocument(docId);
+    if (result) {
+      // Refresh client data to update Quick Facts
+      await refreshClients();
+    }
+  };
+
+  // Handle aggregation of all extractions
+  const handleAggregate = async () => {
+    const result = await aggregateExtractions(selectedClient.id);
+    if (result?.success) {
+      await refreshClients();
+    }
+  };
+
+  // Count documents with completed extractions
+  const completedExtractions = selectedClient.documents.filter(
+    d => d.extractionStatus === 'completed'
+  ).length;
 
   return (
     <aside className="w-72 border-l border-border-01 bg-card flex flex-col flex-shrink-0 overflow-y-auto">
@@ -46,8 +76,21 @@ function RightSidebar() {
 
       {/* Quick Facts */}
       <div className="p-4 border-b border-border-01">
-        <div className="text-xs text-text-secondary uppercase tracking-wider mb-3">
-          Quick Facts
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs text-text-secondary uppercase tracking-wider">
+            Quick Facts
+          </div>
+          {completedExtractions > 0 && (
+            <button
+              type="button"
+              onClick={handleAggregate}
+              disabled={aggregating}
+              className="text-xs text-accent hover:text-accent/80 disabled:opacity-50"
+              title="Update Quick Facts from extracted documents"
+            >
+              {aggregating ? 'Updating...' : 'Refresh'}
+            </button>
+          )}
         </div>
         <div className="space-y-2.5">
           <div className="flex justify-between text-sm">
@@ -96,22 +139,65 @@ function RightSidebar() {
         <div className="space-y-1">
           {selectedClient.documents.map((doc) => {
             const iconInfo = getDocIcon(doc.name);
+            const extracting = isExtracting(doc.id);
+            const error = getError(doc.id);
+            const canExtract = isPDF(doc) && doc.extractionStatus !== 'completed';
+            const isCompleted = doc.extractionStatus === 'completed';
+            const isFailed = doc.extractionStatus === 'failed';
+
             return (
-              <button
-                key={doc.id}
-                type="button"
-                onClick={() => openDocumentViewer(doc)}
-                className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-card-02 cursor-pointer transition-colors group text-left"
-              >
-                <span
-                  className={`text-xs font-medium px-1.5 py-0.5 rounded ${iconInfo.color} ${iconInfo.bg}`}
+              <div key={doc.id} className="group">
+                <button
+                  type="button"
+                  onClick={() => openDocumentViewer(doc)}
+                  className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-card-02 cursor-pointer transition-colors text-left"
                 >
-                  {iconInfo.label}
-                </span>
-                <span className="text-sm text-text-secondary group-hover:text-text truncate transition-colors">
-                  {doc.name}
-                </span>
-              </button>
+                  <span
+                    className={`text-xs font-medium px-1.5 py-0.5 rounded ${iconInfo.color} ${iconInfo.bg}`}
+                  >
+                    {iconInfo.label}
+                  </span>
+                  <span className="text-sm text-text-secondary group-hover:text-text truncate transition-colors flex-1">
+                    {doc.name}
+                  </span>
+                  {/* Extraction status indicators */}
+                  {isCompleted && (
+                    <span className="text-ansi-green text-xs" title="Data extracted">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                  )}
+                  {isFailed && (
+                    <span className="text-ansi-red text-xs" title={doc.extractionError || 'Extraction failed'}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  )}
+                  {extracting && (
+                    <span className="text-accent text-xs animate-pulse">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </span>
+                  )}
+                  {canExtract && !extracting && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleExtract(e, doc.id)}
+                      className="opacity-0 group-hover:opacity-100 text-xs text-accent hover:text-accent/80 transition-opacity px-1.5 py-0.5 rounded hover:bg-accent/10"
+                      title="Extract data from this document"
+                    >
+                      Extract
+                    </button>
+                  )}
+                </button>
+                {error && (
+                  <p className="text-xs text-ansi-red px-2 pb-1">{error}</p>
+                )}
+              </div>
             );
           })}
         </div>
@@ -126,6 +212,7 @@ function RightSidebar() {
 
 function ChatContent() {
   const { selectedTask } = useChat();
+  const { user, signOut } = useAuth();
 
   return (
     <>
@@ -144,6 +231,17 @@ function ChatContent() {
           </Link>
           <div className="flex items-center gap-3">
             <span className="text-xs text-text-secondary">Research Assistant</span>
+            {user?.email && (
+              <>
+                <span className="text-xs text-text-tertiary truncate max-w-[150px]">{user.email}</span>
+                <button
+                  onClick={signOut}
+                  className="text-xs text-text-secondary hover:text-accent transition-colors"
+                >
+                  Sign out
+                </button>
+              </>
+            )}
           </div>
         </header>
 
