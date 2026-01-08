@@ -165,7 +165,7 @@ export function getDocumentTypeLabel(type: DocumentType): string {
 
 export const MOCK_CLIENTS: Client[] = [
   {
-    id: '1',
+    id: '00000000-0000-0000-0000-000000000001',
     name: 'John Smith',
     state: 'FL',
     taxYear: 2024,
@@ -182,7 +182,7 @@ export const MOCK_CLIENTS: Client[] = [
     ],
   },
   {
-    id: '2',
+    id: '00000000-0000-0000-0000-000000000002',
     name: 'Sarah Johnson',
     state: 'CA',
     taxYear: 2024,
@@ -197,7 +197,7 @@ export const MOCK_CLIENTS: Client[] = [
     ],
   },
   {
-    id: '3',
+    id: '00000000-0000-0000-0000-000000000003',
     name: 'Michael Chen',
     state: 'TX',
     taxYear: 2024,
@@ -215,13 +215,13 @@ export const MOCK_CLIENTS: Client[] = [
 ];
 
 export const INITIAL_THREADS: ChatThread[] = [
-  { id: 't1', title: 'Home office deduction analysis', timestamp: 'Active', clientId: '1' },
-  { id: 't2', title: 'QBI limitation for Schedule C', timestamp: 'Yesterday', clientId: '1' },
-  { id: 't3', title: 'Vehicle depreciation 179 vs MACRS', timestamp: 'Jan 3', clientId: '1' },
+  { id: '00000000-0000-0000-1000-000000000001', title: 'Home office deduction analysis', timestamp: 'Active', clientId: '00000000-0000-0000-0000-000000000001' },
+  { id: '00000000-0000-0000-1000-000000000002', title: 'QBI limitation for Schedule C', timestamp: 'Yesterday', clientId: '00000000-0000-0000-0000-000000000001' },
+  { id: '00000000-0000-0000-1000-000000000003', title: 'Vehicle depreciation 179 vs MACRS', timestamp: 'Jan 3', clientId: '00000000-0000-0000-0000-000000000001' },
 ];
 
 export const INITIAL_MESSAGES: Record<string, Message[]> = {
-  t1: [
+  '00000000-0000-0000-1000-000000000001': [
     {
       id: 'm1',
       role: 'user',
