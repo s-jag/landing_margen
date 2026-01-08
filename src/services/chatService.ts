@@ -1,5 +1,7 @@
 import type { ChatRequest, ChatResponse, Citation, StreamEvent } from '@/types/chat';
 import { generateMessageId, getCurrentTimestamp } from '@/lib/chatUtils';
+import { streamQueryByState, getStateCapabilities } from '@/services/ragService';
+import type { UnifiedStreamEvent, UnifiedRAGResponse } from '@/types/rag';
 
 // =============================================================================
 // CHAT SERVICE INTERFACE
@@ -8,6 +10,76 @@ import { generateMessageId, getCurrentTimestamp } from '@/lib/chatUtils';
 export interface ChatService {
   sendMessage(request: ChatRequest): Promise<ChatResponse>;
   streamMessage(request: ChatRequest): AsyncGenerator<StreamEvent>;
+}
+
+// =============================================================================
+// HELPER: Transform Unified Events to Legacy StreamEvent
+// =============================================================================
+
+function transformUnifiedEvent(event: UnifiedStreamEvent): StreamEvent | null {
+  switch (event.type) {
+    case 'status':
+      return { type: 'status', message: event.message };
+    case 'reasoning':
+      return {
+        type: 'reasoning',
+        step: event.step,
+        node: event.node,
+        description: event.description,
+      };
+    case 'chunk':
+      return {
+        type: 'chunk',
+        chunks: event.chunks.map((c) => ({
+          chunkId: c.chunkId || '',
+          citation: c.citation,
+          relevanceScore: c.relevanceScore,
+          // Utah-specific fields
+          authorityLevel: c.authorityLevel,
+          sourceLabel: c.sourceLabel,
+          link: c.link,
+        })),
+      };
+    case 'answer':
+      return { type: 'answer', content: event.content };
+    case 'complete':
+      return {
+        type: 'complete',
+        metadata: {
+          requestId: event.response.requestId,
+          confidence: event.response.confidence,
+          processingTimeMs: event.response.processingTimeMs,
+          citationCount: event.response.citations.length,
+          sourceCount: event.response.citations.length,
+          // Utah-specific fields
+          formsMentioned: event.response.formsMentioned,
+          taxType: event.response.taxType,
+          taxTypeLabel: event.response.taxTypeLabel,
+          warnings: event.response.warnings,
+          confidenceLabel: event.response.confidenceLabel,
+        },
+      };
+    case 'error':
+      return { type: 'error', error: event.error, message: event.message };
+    default:
+      return null;
+  }
+}
+
+// Extended response with Utah-specific fields
+export interface ExtendedChatResponse extends ChatResponse {
+  formsMentioned?: string[];
+  taxType?: string;
+  taxTypeLabel?: string;
+  warnings?: string[];
+  confidenceLabel?: string;
+  stateCapabilities?: {
+    supportsStreaming: boolean;
+    supportsSourceDrilldown: boolean;
+    hasTaxForms: boolean;
+    hasTaxTypeClassification: boolean;
+    hasAuthorityLevels: boolean;
+  };
 }
 
 // =============================================================================
@@ -63,12 +135,44 @@ class RealChatService implements ChatService {
   }
 
   /**
-   * Stream a message via the /api/query/stream endpoint (SSE)
-   * Falls back to test endpoint in development if auth fails
-   * Includes client state and filing status for jurisdiction-specific answers
+   * Stream a message using state-based routing.
+   * Routes to the appropriate RAG API (Utah, Florida, etc.) based on client state.
+   * Automatically handles streaming vs non-streaming APIs (simulates streaming for Utah).
    */
   async *streamMessage(request: ChatRequest): AsyncGenerator<StreamEvent> {
-    // Extract client context for RAG
+    // Extract client context for RAG routing
+    const clientState = request.context?.clientData?.state || 'FL';
+    const clientContext = request.context?.clientData ? {
+      state: request.context.clientData.state,
+      filingStatus: request.context.clientData.filingStatus,
+    } : undefined;
+
+    try {
+      // Use state-based routing - automatically routes to correct API
+      // and handles streaming/non-streaming differences
+      for await (const event of streamQueryByState(
+        request.message,
+        clientState,
+        undefined,
+        clientContext
+      )) {
+        const transformedEvent = transformUnifiedEvent(event);
+        if (transformedEvent) {
+          yield transformedEvent;
+        }
+      }
+    } catch (error) {
+      // If state-based routing fails, fall back to legacy API approach
+      console.warn('State-based routing failed, falling back to legacy API:', error);
+      yield* this.legacyStreamMessage(request);
+    }
+  }
+
+  /**
+   * Legacy stream method that uses the /api/query/stream endpoint directly.
+   * Used as fallback if state-based routing fails.
+   */
+  private async *legacyStreamMessage(request: ChatRequest): AsyncGenerator<StreamEvent> {
     const clientContext = request.context?.clientData ? {
       state: request.context.clientData.state,
       filingStatus: request.context.clientData.filingStatus,
@@ -85,7 +189,7 @@ class RealChatService implements ChatService {
     });
 
     if (!response.ok) {
-      // Fall back to test endpoint in development (handles auth and validation errors)
+      // Fall back to test endpoint in development
       response = await fetch('/api/test-query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,7 +223,6 @@ class RealChatService implements ChatService {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Process complete SSE events
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
@@ -127,7 +230,6 @@ class RealChatService implements ChatService {
           if (line.startsWith('data: ')) {
             const data = line.slice(6).trim();
 
-            // Check for stream end
             if (data === '[DONE]') {
               return;
             }

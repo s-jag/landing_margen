@@ -7,6 +7,8 @@ import type {
   HealthResponse,
   StreamEvent,
 } from '@/types/api';
+import { ragProviderRegistry } from '@/services/rag';
+import type { UnifiedRAGResponse, UnifiedStreamEvent, ClientContext } from '@/types/rag';
 
 // =============================================================================
 // CONFIGURATION
@@ -49,6 +51,53 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   return response.json();
+}
+
+// =============================================================================
+// STATE-BASED RAG SERVICE (NEW - Uses Provider Registry)
+// =============================================================================
+
+/**
+ * Query the appropriate RAG API based on client state.
+ * Routes to Utah API for UT clients, Florida API for FL clients, etc.
+ */
+export async function queryByState(
+  query: string,
+  stateCode: string,
+  options?: QueryOptions,
+  clientContext?: ClientContext
+): Promise<UnifiedRAGResponse> {
+  const provider = ragProviderRegistry.getProvider(stateCode);
+  return provider.query(query, options, clientContext);
+}
+
+/**
+ * Stream query to the appropriate RAG API based on client state.
+ * Note: Not all state APIs support streaming - will be simulated if not supported.
+ */
+export async function* streamQueryByState(
+  query: string,
+  stateCode: string,
+  options?: QueryOptions,
+  clientContext?: ClientContext
+): AsyncGenerator<UnifiedStreamEvent> {
+  const provider = ragProviderRegistry.getProvider(stateCode);
+  yield* provider.streamQuery(query, options, clientContext);
+}
+
+/**
+ * Check if a state has its own dedicated RAG API.
+ */
+export function hasStateProvider(stateCode: string): boolean {
+  return ragProviderRegistry.hasProvider(stateCode);
+}
+
+/**
+ * Get the capabilities for a state's RAG provider.
+ */
+export function getStateCapabilities(stateCode: string) {
+  const provider = ragProviderRegistry.getProvider(stateCode);
+  return provider.getCapabilities();
 }
 
 // =============================================================================

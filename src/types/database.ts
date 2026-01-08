@@ -14,6 +14,25 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+/**
+ * Extracted financial data from document AI processing
+ */
+export interface ExtractedDocumentData {
+  documentType: 'W2' | '1099' | 'Receipt' | 'Prior Return' | 'Other';
+  confidence: number;
+  extractedData: {
+    grossIncome?: number | null;
+    schedCRevenue?: number | null;
+    dependents?: number | null;
+    wages?: number | null;
+    federalWithholding?: number | null;
+    stateWithholding?: number | null;
+    businessIncome?: number | null;
+    businessExpenses?: number | null;
+  };
+  rawFields: Record<string, string | number | null>;
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -142,6 +161,10 @@ export type Database = {
           mime_type: string | null;
           uploaded_by: string | null;
           created_at: string;
+          extraction_status: 'pending' | 'processing' | 'completed' | 'failed';
+          extracted_data: ExtractedDocumentData | null;
+          extracted_at: string | null;
+          extraction_error: string | null;
         };
         Insert: {
           id?: string;
@@ -153,6 +176,10 @@ export type Database = {
           mime_type?: string | null;
           uploaded_by?: string | null;
           created_at?: string;
+          extraction_status?: 'pending' | 'processing' | 'completed' | 'failed';
+          extracted_data?: ExtractedDocumentData | null;
+          extracted_at?: string | null;
+          extraction_error?: string | null;
         };
         Update: {
           id?: string;
@@ -164,6 +191,10 @@ export type Database = {
           mime_type?: string | null;
           uploaded_by?: string | null;
           created_at?: string;
+          extraction_status?: 'pending' | 'processing' | 'completed' | 'failed';
+          extracted_data?: ExtractedDocumentData | null;
+          extracted_at?: string | null;
+          extraction_error?: string | null;
         };
       };
       threads: {

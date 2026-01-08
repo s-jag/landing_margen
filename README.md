@@ -9,6 +9,7 @@ AI-powered tax research assistant built for speed and accuracy. Margen helps tax
 - **Database:** PostgreSQL via Supabase
 - **Authentication:** Supabase Auth
 - **Storage:** Supabase Storage
+- **AI Extraction:** Claude API (Anthropic)
 - **Styling:** Tailwind CSS
 - **Animation:** Framer Motion
 - **Validation:** Zod
@@ -53,6 +54,7 @@ Run the migrations in order in Supabase SQL Editor:
 ```
 1. supabase/migrations/001_initial_schema.sql
 2. supabase/migrations/002_rls_policies.sql
+3. supabase/migrations/003_document_extraction.sql
 ```
 
 ## Project Structure
@@ -166,6 +168,9 @@ When rate limited, the API returns `429 Too Many Requests` with a `Retry-After` 
 | `/api/documents/upload` | POST | Upload document (multipart) |
 | `/api/documents/[id]` | GET | Get document with signed URL |
 | `/api/documents/[id]` | DELETE | Delete document |
+| `/api/documents/[id]/extract` | POST | Extract data from PDF using AI |
+| `/api/documents/[id]/extract` | GET | Get extraction status/result |
+| `/api/clients/[id]/aggregate-extractions` | POST | Aggregate all extractions and update client |
 
 ### Health Check
 
@@ -224,6 +229,24 @@ src/app/chat/components/
 - **Complete tax code understanding** - Semantic search across IRC sections
 - **Multi-model support** - Access to Claude, GPT-4, Gemini, and more
 - **Enterprise ready** - Secure, scalable architecture for accounting firms
+- **AI Document Extraction** - Automatically extract financial data from uploaded PDFs
+
+### Document Extraction
+
+Upload tax documents (W-2, 1099, prior returns) and automatically extract financial data:
+
+**How it works:**
+1. Upload PDF document to client file
+2. Click "Extract" to process with Claude AI
+3. Extracted data (wages, income, withholdings) saved to document
+4. Click "Refresh" in Quick Facts to aggregate all extractions
+
+**Extracted Fields:**
+- W-2: Wages, federal/state withholding
+- 1099-NEC/MISC: Business income → Schedule C revenue
+- Prior Returns: AGI, Schedule C, dependents
+
+**Cost:** ~$0.001-0.005 per document using Claude 3.5 Haiku
 
 ## Security
 
@@ -251,6 +274,9 @@ Test endpoints (`/api/test-*`) are available for development but **blocked in pr
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
 | `RAG_API_BASE_URL` | No | RAG API URL (default: http://localhost:8000) |
 | `RAG_API_KEY` | No | RAG API authentication key |
+| `ANTHROPIC_API_KEY` | No | Claude API key for document extraction |
+| `RESEND_API_KEY` | No | Resend API key for contact form emails |
+| `CONTACT_EMAIL` | No | Email address to receive contact form submissions |
 
 ## Design System
 

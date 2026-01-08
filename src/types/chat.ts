@@ -20,6 +20,10 @@ export interface Document {
   name: string;
   type: 'W2' | '1099' | 'Receipt' | 'Prior Return' | 'Other';
   uploadedAt?: string;
+  mimeType?: string;
+  extractionStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  extractedAt?: string;
+  extractionError?: string;
 }
 
 export type DocumentType = Document['type'];
@@ -39,6 +43,14 @@ export interface Message {
   citation?: Citation;
   comparison?: Comparison;
   sources?: SourceChip[];
+  // Utah-specific fields (and future state-specific fields)
+  formsMentioned?: string[];
+  taxType?: string;
+  taxTypeLabel?: string;
+  warnings?: string[];
+  confidenceLabel?: string;
+  // Capability flags
+  canDrillIntoSources?: boolean;
 }
 
 export interface Citation {
@@ -49,6 +61,9 @@ export interface Citation {
   docType?: string;
   chunkId?: string;
   isLoading?: boolean;
+  // Utah-specific fields
+  authorityLevel?: number;  // 1=highest authority
+  sourceLabel?: string;     // Human-readable source label
 }
 
 // =============================================================================
@@ -121,6 +136,12 @@ export interface SourceChip {
   chunkId: string;
   citation: string;
   relevanceScore: number;
+  // Utah-specific fields
+  authorityLevel?: number;
+  sourceLabel?: string;
+  link?: string;
+  // Capability flag
+  canDrillInto?: boolean;
 }
 
 export interface StreamMetadata {
@@ -129,6 +150,12 @@ export interface StreamMetadata {
   processingTimeMs: number;
   citationCount: number;
   sourceCount: number;
+  // Utah-specific fields
+  formsMentioned?: string[];
+  taxType?: string;
+  taxTypeLabel?: string;
+  warnings?: string[];
+  confidenceLabel?: string;
 }
 
 export type StreamEvent =

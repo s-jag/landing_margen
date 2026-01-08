@@ -8,6 +8,9 @@ import { TypingIndicator } from './TypingIndicator';
 import StreamingMessage from './StreamingMessage';
 import ReasoningSteps from './ReasoningSteps';
 import SourceChips from './SourceChips';
+import { WarningBanner } from './WarningBanner';
+import { TaxForms } from './TaxForms';
+import { AuthorityBadge } from './AuthorityBadge';
 
 export function MessageList() {
   const {
@@ -56,7 +59,30 @@ export function MessageList() {
                 {message.role === 'user' ? 'You' : 'Margen'}
               </span>
               <span className="text-xs text-text-tertiary">{message.timestamp}</span>
+              {/* Tax Type Badge (Utah-specific) */}
+              {message.taxTypeLabel && (
+                <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  {message.taxTypeLabel}
+                </span>
+              )}
+              {/* Confidence Label (Utah-specific) */}
+              {message.confidenceLabel && (
+                <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full border ${
+                  message.confidenceLabel === 'high'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    : message.confidenceLabel === 'medium'
+                    ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                    : 'bg-red-500/20 text-red-400 border-red-500/30'
+                }`}>
+                  {message.confidenceLabel} confidence
+                </span>
+              )}
             </div>
+
+            {/* Warnings Banner (Utah-specific) */}
+            {message.warnings && message.warnings.length > 0 && (
+              <WarningBanner warnings={message.warnings} />
+            )}
 
             {/* Message Content */}
             <div
@@ -139,8 +165,20 @@ export function MessageList() {
                       Click to view full source
                     </div>
                   )}
+                  {/* Authority Level Badge (Utah-specific) */}
+                  {message.citation.authorityLevel !== undefined && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-text-tertiary">Authority:</span>
+                      <AuthorityBadge level={message.citation.authorityLevel} />
+                    </div>
+                  )}
                 </div>
               </button>
+            )}
+
+            {/* Tax Forms (Utah-specific) */}
+            {message.formsMentioned && message.formsMentioned.length > 0 && (
+              <TaxForms forms={message.formsMentioned} />
             )}
           </div>
         ))}

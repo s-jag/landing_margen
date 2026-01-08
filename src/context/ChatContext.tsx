@@ -853,14 +853,34 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
             case 'chunk':
               // Collect sources for final message
-              collectedSources.push(...event.chunks);
-              dispatch({ type: 'ADD_PENDING_SOURCES', payload: event.chunks });
+              // Map to SourceChip format with Utah-specific fields
+              const sourceChips = event.chunks.map((chunk) => ({
+                chunkId: chunk.chunkId,
+                citation: chunk.citation,
+                relevanceScore: chunk.relevanceScore,
+                // Utah-specific fields - check capability
+                authorityLevel: (chunk as { authorityLevel?: number }).authorityLevel,
+                sourceLabel: (chunk as { sourceLabel?: string }).sourceLabel,
+                link: (chunk as { link?: string }).link,
+                // Determine if source can be drilled into based on provider capabilities
+                canDrillInto: selectedClient?.state !== 'UT',
+              }));
+              collectedSources.push(...sourceChips);
+              dispatch({ type: 'ADD_PENDING_SOURCES', payload: sourceChips });
               // Use first chunk as citation if we have sources
               if (event.chunks.length > 0 && !citation) {
+                const firstChunk = event.chunks[0] as {
+                  citation: string;
+                  chunkId: string;
+                  authorityLevel?: number;
+                  sourceLabel?: string;
+                };
                 citation = {
-                  source: event.chunks[0].citation,
+                  source: firstChunk.citation,
                   excerpt: 'View source for full details',
-                  chunkId: event.chunks[0].chunkId,
+                  chunkId: firstChunk.chunkId,
+                  authorityLevel: firstChunk.authorityLevel,
+                  sourceLabel: firstChunk.sourceLabel,
                 };
               }
               break;
@@ -871,7 +891,16 @@ export function ChatProvider({ children }: ChatProviderProps) {
               break;
 
             case 'complete':
-              // Finalize the message with sources
+              // Extract Utah-specific fields from complete event metadata if available
+              const metadata = event.metadata as {
+                formsMentioned?: string[];
+                taxType?: string;
+                taxTypeLabel?: string;
+                warnings?: string[];
+                confidenceLabel?: string;
+              } | undefined;
+
+              // Finalize the message with sources and Utah-specific fields
               const assistantMessage: Message = {
                 id: `msg-${Date.now()}`,
                 role: 'assistant',
@@ -879,6 +908,14 @@ export function ChatProvider({ children }: ChatProviderProps) {
                 timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
                 citation,
                 sources: collectedSources.length > 0 ? collectedSources : undefined,
+                // Utah-specific fields
+                formsMentioned: metadata?.formsMentioned,
+                taxType: metadata?.taxType,
+                taxTypeLabel: metadata?.taxTypeLabel,
+                warnings: metadata?.warnings,
+                confidenceLabel: metadata?.confidenceLabel,
+                // Capability flag
+                canDrillIntoSources: selectedClient?.state !== 'UT',
               };
               dispatch({
                 type: 'FINALIZE_MESSAGE',
