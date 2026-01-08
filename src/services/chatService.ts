@@ -29,8 +29,8 @@ class RealChatService implements ChatService {
       }),
     });
 
-    if (response.status === 401) {
-      // Fall back to test endpoint in development
+    if (!response.ok) {
+      // Fall back to test endpoint in development (handles auth and validation errors)
       response = await fetch('/api/test-query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41,7 +41,7 @@ class RealChatService implements ChatService {
     }
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json().catch(() => ({}));
       throw new Error(error.message || 'Failed to send message');
     }
 
@@ -84,8 +84,8 @@ class RealChatService implements ChatService {
       }),
     });
 
-    if (response.status === 401) {
-      // Fall back to test endpoint in development
+    if (!response.ok) {
+      // Fall back to test endpoint in development (handles auth and validation errors)
       response = await fetch('/api/test-query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,7 +97,7 @@ class RealChatService implements ChatService {
     }
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json().catch(() => ({}));
       yield { type: 'error', error: 'REQUEST_FAILED', message: error.message || 'Failed to start stream' };
       return;
     }

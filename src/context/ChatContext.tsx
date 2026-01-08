@@ -489,10 +489,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
   // Refresh clients from API
   const refreshClients = useCallback(async () => {
     try {
-      // Use production endpoint (falls back to test in development if auth fails)
+      // Use production endpoint (falls back to test in development if it fails)
       let response = await fetch('/api/clients');
-      if (response.status === 401) {
-        // Fall back to test endpoint in development
+      if (!response.ok) {
+        // Fall back to test endpoint in development (handles auth and validation errors)
         response = await fetch('/api/test-clients');
       }
       if (response.ok) {
@@ -521,8 +521,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
           fetch('/api/threads'),
         ]);
 
-        // Fall back to test endpoints if auth fails (development mode)
-        if (clientsRes.status === 401 || threadsRes.status === 401) {
+        // Fall back to test endpoints if production fails (handles auth and validation errors)
+        if (!clientsRes.ok || !threadsRes.ok) {
           [clientsRes, threadsRes] = await Promise.all([
             fetch('/api/test-clients'),
             fetch('/api/test-threads'),
@@ -605,8 +605,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
       try {
         // Try production endpoint first
         let response = await fetch(`/api/threads/${threadId}/messages`);
-        if (response.status === 401) {
-          // Fall back to test endpoint in development
+        if (!response.ok) {
+          // Fall back to test endpoint in development (handles auth and validation errors)
           response = await fetch(`/api/test-messages?threadId=${threadId}`);
         }
         if (response.ok) {
@@ -652,8 +652,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         }),
       });
 
-      if (response.status === 401) {
-        // Fall back to test endpoint in development
+      if (!response.ok) {
+        // Fall back to test endpoint in development (handles 401 auth and 400 validation errors)
         response = await fetch('/api/test-threads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -715,8 +715,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
             }),
           });
 
-          if (response.status === 401) {
-            // Fall back to test endpoint in development
+          if (!response.ok) {
+            // Fall back to test endpoint in development (handles 401 auth and 400 validation errors)
             response = await fetch('/api/test-threads', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -780,8 +780,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
           }),
         });
 
-        if (msgResponse.status === 401) {
-          // Fall back to test endpoint in development
+        if (!msgResponse.ok) {
+          // Fall back to test endpoint in development (handles 401 auth and 400 validation errors)
           await fetch('/api/test-messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -897,8 +897,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
                   }),
                 });
 
-                if (asstResponse.status === 401) {
-                  // Fall back to test endpoint in development
+                if (!asstResponse.ok) {
+                  // Fall back to test endpoint in development (handles 401 auth and 400 validation errors)
                   await fetch('/api/test-messages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1067,8 +1067,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
     try {
       // Try production endpoint first
       let response = await fetch(`/api/sources/${encodeURIComponent(chunkId)}`);
-      if (response.status === 401) {
-        // Fall back to test endpoint in development
+      if (!response.ok && response.status !== 404) {
+        // Fall back to test endpoint in development (handles auth errors, but not 404)
         response = await fetch(`/api/test-sources/${encodeURIComponent(chunkId)}`);
       }
 
