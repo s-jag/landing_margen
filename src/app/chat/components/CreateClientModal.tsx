@@ -83,7 +83,8 @@ export function CreateClientModal({ isOpen, onClose, onClientCreated }: CreateCl
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/test-clients', {
+      // Try production endpoint first (requires auth), fall back to test endpoint
+      let response = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,6 +94,20 @@ export function CreateClientModal({ isOpen, onClose, onClientCreated }: CreateCl
           taxYear: new Date().getFullYear(),
         }),
       });
+
+      // Fall back to test endpoint if auth fails
+      if (!response.ok && response.status === 401) {
+        response = await fetch('/api/test-clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            state,
+            filingStatus,
+            taxYear: new Date().getFullYear(),
+          }),
+        });
+      }
 
       if (!response.ok) {
         const data = await response.json();

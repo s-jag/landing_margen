@@ -38,7 +38,7 @@ export interface StateRAGConfig {
 const FLORIDA_CONFIG: StateRAGConfig = {
   stateCode: 'FL',
   stateName: 'Florida',
-  apiBaseUrl: process.env.FLORIDA_RAG_API_URL || process.env.RAG_API_BASE_URL || 'http://localhost:8001',
+  apiBaseUrl: process.env.FLORIDA_RAG_API_URL || process.env.RAG_API_BASE_URL || 'https://florida-tax-rag-production.up.railway.app',
   apiKey: process.env.FLORIDA_RAG_API_KEY || process.env.RAG_API_KEY,
   capabilities: {
     supportsStreaming: true,
@@ -58,7 +58,7 @@ const FLORIDA_CONFIG: StateRAGConfig = {
 const UTAH_CONFIG: StateRAGConfig = {
   stateCode: 'UT',
   stateName: 'Utah',
-  apiBaseUrl: process.env.UTAH_RAG_API_URL || 'http://localhost:8000',
+  apiBaseUrl: process.env.UTAH_RAG_API_URL || 'https://utah-tax-api-v2-production.up.railway.app',
   apiKey: process.env.UTAH_RAG_API_KEY,
   capabilities: {
     supportsStreaming: false,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { createClientSchema } from '@/types/api';
 import { standardLimiter, checkRateLimit } from '@/lib/rateLimit';
 
@@ -86,15 +86,54 @@ export async function POST(request: Request) {
     const rateLimitError = await checkRateLimit(request, standardLimiter, user.id);
     if (rateLimitError) return rateLimitError;
 
-    // Get user's organization
-    const { data: userData } = await supabase
+    // Get or create user's organization
+    let { data: userData } = await supabase
       .from('users')
       .select('organization_id')
       .eq('id', user.id)
       .single();
 
+    // Auto-create organization and user record if needed
     if (!userData?.organization_id) {
-      return NextResponse.json({ error: 'NO_ORGANIZATION', message: 'User must belong to an organization' }, { status: 400 });
+      // Use admin client to bypass RLS for organization setup
+      const adminClient = createAdminClient();
+
+      // Create a personal organization for the user
+      const orgName = user.email ? `${user.email.split('@')[0]}'s Organization` : 'My Organization';
+      const orgSlug = `org-${user.id.slice(0, 8)}`;
+
+      const { data: newOrg, error: orgError } = await adminClient
+        .from('organizations')
+        .insert({
+          name: orgName,
+          slug: orgSlug,
+          plan: 'free',
+          settings: {},
+        })
+        .select()
+        .single();
+
+      if (orgError) {
+        console.error('Error creating organization:', orgError);
+        return NextResponse.json({ error: 'DATABASE_ERROR', message: 'Failed to create organization' }, { status: 500 });
+      }
+
+      // Create or update user record with organization
+      const { error: userError } = await adminClient
+        .from('users')
+        .upsert({
+          id: user.id,
+          email: user.email,
+          organization_id: newOrg.id,
+          role: 'owner',
+        });
+
+      if (userError) {
+        console.error('Error creating user record:', userError);
+        return NextResponse.json({ error: 'DATABASE_ERROR', message: 'Failed to link user to organization' }, { status: 500 });
+      }
+
+      userData = { organization_id: newOrg.id };
     }
 
     // Parse and validate request body

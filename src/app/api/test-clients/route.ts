@@ -5,7 +5,8 @@ import { createAdminClient } from '@/lib/supabase/server';
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Default organization ID for testing (bypasses auth)
-const DEFAULT_ORG_ID = process.env.TEST_ORGANIZATION_ID || 'test-org-001';
+// Must be a valid UUID format for the database
+const DEFAULT_ORG_ID = process.env.TEST_ORGANIZATION_ID || '00000000-0000-0000-0000-000000000001';
 
 /**
  * GET /api/test-clients - List all clients (NO AUTH - for testing only)
