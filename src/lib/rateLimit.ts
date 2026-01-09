@@ -2,17 +2,18 @@
  * Rate Limiting Utility
  *
  * Provides rate limiting for API routes using a sliding window algorithm.
- * Uses in-memory storage by default, can be upgraded to Redis for production.
+ * Uses Upstash Redis in production (if configured), falls back to in-memory for development.
  *
  * Usage:
- *   import { rateLimit, RateLimitConfig } from '@/lib/rateLimit';
+ *   import { checkRateLimit, queryLimiter } from '@/lib/rateLimit';
  *
- *   const limiter = rateLimit({ limit: 10, window: '10s' });
- *   const result = await limiter.check(identifier);
- *   if (!result.success) return rateLimitResponse(result);
+ *   const rateLimitResponse = await checkRateLimit(request, queryLimiter, userId);
+ *   if (rateLimitResponse) return rateLimitResponse;
  */
 
 import { NextResponse } from 'next/server';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 
 // =============================================================================
 // TYPES
@@ -40,7 +41,42 @@ interface RateLimitEntry {
 }
 
 // =============================================================================
-// IN-MEMORY STORE
+// UPSTASH REDIS CONFIGURATION
+// =============================================================================
+
+/**
+ * Check if Upstash Redis is configured via environment variables.
+ * Both URL and TOKEN must be present to use Redis.
+ */
+function isUpstashConfigured(): boolean {
+  return !!(
+    process.env.UPSTASH_REDIS_REST_URL &&
+    process.env.UPSTASH_REDIS_REST_TOKEN
+  );
+}
+
+/**
+ * Create Redis client if Upstash is configured.
+ * Returns null if not configured (development mode).
+ */
+function createRedisClient(): Redis | null {
+  if (!isUpstashConfigured()) {
+    return null;
+  }
+
+  try {
+    return Redis.fromEnv();
+  } catch (error) {
+    console.warn('Failed to initialize Upstash Redis, falling back to in-memory:', error);
+    return null;
+  }
+}
+
+// Initialize Redis client (null in development)
+const redis = createRedisClient();
+
+// =============================================================================
+// IN-MEMORY STORE (Development Fallback)
 // =============================================================================
 
 class InMemoryStore {
@@ -83,8 +119,8 @@ class InMemoryStore {
   }
 }
 
-// Singleton store instance
-const store = new InMemoryStore();
+// Singleton store instance for in-memory fallback
+const inMemoryStore = new InMemoryStore();
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -110,6 +146,21 @@ function parseWindow(window: string): number {
     case 'd': return value * 24 * 60 * 60 * 1000;
     default: throw new Error(`Unknown time unit: ${unit}`);
   }
+}
+
+/**
+ * Convert window string to Upstash duration format
+ */
+function toUpstashDuration(window: string): `${number} s` | `${number} m` | `${number} h` | `${number} d` {
+  const match = window.match(/^(\d+)(s|m|h|d)$/);
+  if (!match) {
+    throw new Error(`Invalid window format: ${window}`);
+  }
+
+  const value = parseInt(match[1], 10);
+  const unit = match[2] as 's' | 'm' | 'h' | 'd';
+
+  return `${value} ${unit}`;
 }
 
 /**
@@ -147,17 +198,59 @@ export function getIdentifier(request: Request, userId?: string): string {
 }
 
 // =============================================================================
-// RATE LIMITER
+// RATE LIMITER INTERFACE
 // =============================================================================
 
 export interface RateLimiter {
   check(identifier: string): Promise<RateLimitResult>;
 }
 
+// =============================================================================
+// UPSTASH RATE LIMITER
+// =============================================================================
+
 /**
- * Create a rate limiter with the given configuration
+ * Create a rate limiter backed by Upstash Redis.
+ * Provides distributed rate limiting across all serverless instances.
  */
-export function rateLimit(config: RateLimitConfig): RateLimiter {
+function createUpstashLimiter(config: RateLimitConfig): RateLimiter {
+  if (!redis) {
+    throw new Error('Redis client not initialized');
+  }
+
+  const { limit, window, prefix = 'rl' } = config;
+  const duration = toUpstashDuration(window);
+
+  const limiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(limit, duration),
+    prefix: `@upstash/ratelimit:${prefix}`,
+    analytics: true, // Enable analytics in Upstash dashboard
+  });
+
+  return {
+    async check(identifier: string): Promise<RateLimitResult> {
+      const result = await limiter.limit(identifier);
+
+      return {
+        success: result.success,
+        limit: result.limit,
+        remaining: result.remaining,
+        reset: Math.floor(result.reset / 1000), // Convert to Unix timestamp
+      };
+    },
+  };
+}
+
+// =============================================================================
+// IN-MEMORY RATE LIMITER
+// =============================================================================
+
+/**
+ * Create a rate limiter backed by in-memory storage.
+ * Used for development or when Redis is not configured.
+ */
+function createInMemoryLimiter(config: RateLimitConfig): RateLimiter {
   const { limit, window, prefix = 'rl' } = config;
   const windowMs = parseWindow(window);
 
@@ -166,7 +259,7 @@ export function rateLimit(config: RateLimitConfig): RateLimiter {
       const key = `${prefix}:${identifier}`;
       const now = Date.now();
 
-      let entry = store.get(key);
+      let entry = inMemoryStore.get(key);
 
       if (!entry || entry.resetAt < now) {
         // Create new window
@@ -174,7 +267,7 @@ export function rateLimit(config: RateLimitConfig): RateLimiter {
           count: 1,
           resetAt: now + windowMs,
         };
-        store.set(key, entry);
+        inMemoryStore.set(key, entry);
 
         return {
           success: true,
@@ -186,7 +279,7 @@ export function rateLimit(config: RateLimitConfig): RateLimiter {
 
       // Increment existing window
       entry.count++;
-      store.set(key, entry);
+      inMemoryStore.set(key, entry);
 
       const remaining = Math.max(0, limit - entry.count);
       const success = entry.count <= limit;
@@ -199,6 +292,30 @@ export function rateLimit(config: RateLimitConfig): RateLimiter {
       };
     },
   };
+}
+
+// =============================================================================
+// RATE LIMITER FACTORY
+// =============================================================================
+
+/**
+ * Create a rate limiter with the given configuration.
+ * Automatically uses Upstash Redis if configured, otherwise falls back to in-memory.
+ */
+export function rateLimit(config: RateLimitConfig): RateLimiter {
+  if (redis) {
+    return createUpstashLimiter(config);
+  }
+  return createInMemoryLimiter(config);
+}
+
+// Log which rate limiting mode is active
+if (typeof window === 'undefined') {
+  if (redis) {
+    console.log('📊 Rate limiting: Using Upstash Redis (distributed)');
+  } else {
+    console.log('📊 Rate limiting: Using in-memory store (development mode)');
+  }
 }
 
 // =============================================================================
@@ -258,11 +375,13 @@ export const authLimiter = rateLimit({
  * Create a rate limit exceeded response
  */
 export function rateLimitResponse(result: RateLimitResult): NextResponse {
+  const retryAfter = Math.max(0, result.reset - Math.floor(Date.now() / 1000));
+
   return NextResponse.json(
     {
       error: 'RATE_LIMIT_EXCEEDED',
       message: 'Too many requests. Please try again later.',
-      retryAfter: result.reset - Math.floor(Date.now() / 1000),
+      retryAfter,
     },
     {
       status: 429,
@@ -270,7 +389,7 @@ export function rateLimitResponse(result: RateLimitResult): NextResponse {
         'X-RateLimit-Limit': result.limit.toString(),
         'X-RateLimit-Remaining': result.remaining.toString(),
         'X-RateLimit-Reset': result.reset.toString(),
-        'Retry-After': (result.reset - Math.floor(Date.now() / 1000)).toString(),
+        'Retry-After': retryAfter.toString(),
       },
     }
   );
@@ -294,8 +413,12 @@ export function addRateLimitHeaders(
 // =============================================================================
 
 /**
- * Check rate limit and return error response if exceeded
- * Returns null if rate limit is OK
+ * Check rate limit and return error response if exceeded.
+ * Returns null if rate limit is OK.
+ *
+ * @example
+ * const rateLimitResponse = await checkRateLimit(request, queryLimiter, userId);
+ * if (rateLimitResponse) return rateLimitResponse;
  */
 export async function checkRateLimit(
   request: Request,
@@ -310,4 +433,23 @@ export async function checkRateLimit(
   }
 
   return null;
+}
+
+// =============================================================================
+// UTILITIES FOR TESTING
+// =============================================================================
+
+/**
+ * Check if using Upstash Redis for rate limiting.
+ * Useful for debugging and testing.
+ */
+export function isUsingUpstash(): boolean {
+  return redis !== null;
+}
+
+/**
+ * Get the current rate limiting mode.
+ */
+export function getRateLimitMode(): 'upstash' | 'in-memory' {
+  return redis ? 'upstash' : 'in-memory';
 }

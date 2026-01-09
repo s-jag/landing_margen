@@ -38,6 +38,8 @@ function transformUnifiedEvent(event: UnifiedStreamEvent): StreamEvent | null {
           authorityLevel: c.authorityLevel,
           sourceLabel: c.sourceLabel,
           link: c.link,
+          // Capability flag - default to true for backward compatibility
+          canDrillInto: c.canDrillInto ?? true,
         })),
       };
     case 'answer':
@@ -279,7 +281,7 @@ class MockChatService implements ChatService {
     yield { type: 'reasoning', step: 2, node: 'knowledge_retrieval', description: 'Searching knowledge graph' };
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    yield { type: 'chunk', chunks: [{ chunkId: 'mock-1', citation: 'Mock Citation', relevanceScore: 0.95 }] };
+    yield { type: 'chunk', chunks: [{ chunkId: 'mock-1', citation: 'Mock Citation', relevanceScore: 0.95, canDrillInto: true }] };
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     const mockAnswer = `I can help you research tax questions for "${request.message}". The RAG API is not connected - using mock streaming response.`;

@@ -39,6 +39,17 @@ const config: Config = {
           green: 'var(--color-ansi-green)',
           red: 'var(--color-ansi-red)',
         },
+        // Theme namespace for UI components (Button, Card, Section)
+        theme: {
+          bg: 'var(--color-bg)',
+          fg: 'var(--color-text)',
+          card: 'var(--color-card)',
+          'card-hover': 'var(--color-card-02)',
+          accent: 'var(--color-accent)',
+          text: 'var(--color-text)',
+          'text-secondary': 'var(--color-text-secondary)',
+          border: 'var(--color-border-01)',
+        },
       },
       fontFamily: {
         sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica Neue', 'Arial', 'sans-serif'],

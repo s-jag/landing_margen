@@ -15,11 +15,11 @@ export function Frontier() {
         {/* 3-column grid */}
         <div className="grid md:grid-cols-3 gap-g1">
           <FrontierCard
-            title="Access the best models"
-            description="Choose between every cutting-edge model from OpenAI, Anthropic, and more."
-            link={{ label: 'Explore models', href: '/resources/solving-hallucination-in-regulatory-ai' }}
+            title="Instant Research"
+            description="Cut your research time from hours to minutes with AI-powered tax law search."
+            link={{ label: 'See how it works', href: '/features' }}
           >
-            <ModelDropdown />
+            <ResearchTimer />
           </FrontierCard>
 
           <FrontierCard
@@ -31,11 +31,11 @@ export function Frontier() {
           </FrontierCard>
 
           <FrontierCard
-            title="Enterprise ready"
-            description="Trusted by top accounting firms to accelerate work, securely and at scale."
-            link={{ label: 'Explore enterprise', href: '/enterprise' }}
+            title="Built for Tax Pros"
+            description="Designed specifically for CPAs, EAs, and tax attorneys who need reliable answers."
+            link={{ label: 'Learn more', href: '/features' }}
           >
-            <EnterpriseVisual />
+            <TaxProVisual />
           </FrontierCard>
         </div>
       </div>
@@ -69,44 +69,79 @@ function FrontierCard({
   );
 }
 
-function ModelDropdown() {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+function ResearchTimer() {
+  const [phase, setPhase] = useState<'traditional' | 'transition' | 'margen'>('traditional');
 
-  const models = [
-    { name: 'Auto', tag: 'Suggested' },
-    { name: 'Claude Sonnet 4', tag: null },
-    { name: 'Claude Opus 4', tag: null },
-    { name: 'GPT-4o', tag: 'Fast' },
-    { name: 'Gemini Pro', tag: null },
-  ];
+  useEffect(() => {
+    const cycle = () => {
+      setPhase('traditional');
+
+      // Show traditional for 2s
+      const t1 = setTimeout(() => setPhase('transition'), 2000);
+
+      // Transition for 0.5s then show margen
+      const t2 = setTimeout(() => setPhase('margen'), 2500);
+
+      // Show margen for 2.5s then restart
+      const t3 = setTimeout(() => setPhase('traditional'), 5000);
+
+      return [t1, t2, t3];
+    };
+
+    const timeouts = cycle();
+    const interval = setInterval(() => {
+      cycle();
+    }, 5000);
+
+    return () => {
+      timeouts.forEach(clearTimeout);
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
-    <div className="bg-card-02 rounded-xs border border-border-01 p-2">
-      {models.map((model, i) => {
-        const isSelected = i === 1;
-        const isHovered = hoveredIndex === i;
-
-        return (
-          <div
-            key={model.name}
-            onMouseEnter={() => setHoveredIndex(i)}
-            onMouseLeave={() => setHoveredIndex(null)}
-            className={`
-              px-3 py-2 rounded text-sm flex items-center justify-between
-              cursor-pointer transition-all duration-150
-              ${isSelected ? 'bg-card-03' : isHovered ? 'bg-card-03/50' : ''}
-            `}
-          >
-            <span className={isSelected || isHovered ? 'text-text' : 'text-text-secondary'}>
-              {model.name}
-            </span>
-            {model.tag && (
-              <span className="text-xs text-text-tertiary">{model.tag}</span>
-            )}
-            {isSelected && <span className="text-text-tertiary">✓</span>}
+    <div className="bg-card-02 rounded-xs border border-border-01 p-4 h-32 flex items-center justify-center">
+      <div className="relative w-full">
+        {/* Traditional research time */}
+        <div
+          className={`
+            flex items-center justify-between transition-all duration-500
+            ${phase === 'traditional' ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}
+          `}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-card-03 flex items-center justify-center">
+              <svg className="w-5 h-5 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-xs text-text-tertiary">Traditional Research</div>
+              <div className="text-xl font-medium text-text-secondary">2+ hours</div>
+            </div>
           </div>
-        );
-      })}
+        </div>
+
+        {/* Margen research time */}
+        <div
+          className={`
+            absolute inset-0 flex items-center justify-between transition-all duration-500
+            ${phase === 'margen' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+          `}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-xs text-text-tertiary">With Margen</div>
+              <div className="text-xl font-medium text-accent">2 minutes</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -168,42 +203,79 @@ function SearchDemo() {
   );
 }
 
-function EnterpriseVisual() {
-  const [count, setCount] = useState(0);
-  const targetCount = 500;
+function TaxProVisual() {
+  const [visibleChecks, setVisibleChecks] = useState<number[]>([]);
 
   useEffect(() => {
-    const duration = 2000; // 2 seconds
-    const startTime = Date.now();
+    const showChecks = () => {
+      setVisibleChecks([]);
 
-    // Easing function - easeOutExpo
-    const easeOutExpo = (t: number) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+      // Stagger the checkmarks appearing
+      const t1 = setTimeout(() => setVisibleChecks([0]), 500);
+      const t2 = setTimeout(() => setVisibleChecks([0, 1]), 1000);
+      const t3 = setTimeout(() => setVisibleChecks([0, 1, 2]), 1500);
 
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const easedProgress = easeOutExpo(progress);
+      // Reset after showing all for 3 seconds
+      const t4 = setTimeout(() => setVisibleChecks([]), 5000);
 
-      setCount(Math.floor(easedProgress * targetCount));
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
+      return [t1, t2, t3, t4];
     };
 
-    // Start animation after a brief delay
-    const timeout = setTimeout(() => {
-      requestAnimationFrame(animate);
-    }, 500);
+    const timeouts = showChecks();
+    const interval = setInterval(() => {
+      showChecks();
+    }, 5000);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      timeouts.forEach(clearTimeout);
+      clearInterval(interval);
+    };
   }, []);
+
+  const badges = [
+    { label: 'CPA', title: 'Certified Public Accountant' },
+    { label: 'EA', title: 'Enrolled Agent' },
+    { label: 'Attorney', title: 'Tax Attorney' },
+  ];
 
   return (
     <div className="bg-card-02 rounded-xs border border-border-01 p-4 h-32 flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-2xl text-text mb-1">{count}+</div>
-        <div className="text-xs text-text-tertiary">Firms using Margen</div>
+      <div className="flex gap-3">
+        {badges.map((badge, index) => (
+          <div
+            key={badge.label}
+            className="relative flex flex-col items-center"
+          >
+            <div className={`
+              w-14 h-14 rounded-full border-2 flex items-center justify-center
+              transition-all duration-300
+              ${visibleChecks.includes(index)
+                ? 'border-accent bg-accent/10'
+                : 'border-border-02 bg-card-03'
+              }
+            `}>
+              <span className={`
+                text-xs font-medium transition-colors duration-300
+                ${visibleChecks.includes(index) ? 'text-accent' : 'text-text-secondary'}
+              `}>
+                {badge.label}
+              </span>
+            </div>
+            {/* Checkmark */}
+            <div className={`
+              absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent
+              flex items-center justify-center transition-all duration-300
+              ${visibleChecks.includes(index)
+                ? 'opacity-100 scale-100'
+                : 'opacity-0 scale-50'
+              }
+            `}>
+              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
