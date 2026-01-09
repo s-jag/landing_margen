@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 // Animation timing
@@ -19,14 +19,18 @@ const FIELDS = [
 
 export function FeatureAutocomplete() {
   const [cycle, setCycle] = useState(0);
+  const hasPlayed = useRef(false);
 
-  // Loop the animation
+  // Run animation once (no loop)
   useEffect(() => {
-    const loopTimeout = setTimeout(() => {
-      setCycle(c => c + 1);
+    if (hasPlayed.current) return;
+
+    const completeTimeout = setTimeout(() => {
+      hasPlayed.current = true;
+      // Animation stays at final state - no cycle increment
     }, 5500 + LOOP_PAUSE);
 
-    return () => clearTimeout(loopTimeout);
+    return () => clearTimeout(completeTimeout);
   }, [cycle]);
 
   return (

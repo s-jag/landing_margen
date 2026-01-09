@@ -6,6 +6,7 @@ import {
   useReducer,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { ChatThread, Message, Citation, SourceChip } from '@/types/chat';
@@ -147,6 +148,7 @@ interface ThreadContextValue extends ThreadState {
   createThread: () => void;
   sendMessage: (content: string) => Promise<void>;
   setInputValue: (value: string) => void;
+  cleanupEmptyThreads: () => Promise<void>;
 }
 
 const ThreadContext = createContext<ThreadContextValue | null>(null);
@@ -173,6 +175,9 @@ interface ThreadProviderProps {
 
 export function ThreadProvider({ children }: ThreadProviderProps) {
   const [state, dispatch] = useReducer(threadReducer, initialState);
+
+  // Request deduplication: track pending message fetches
+  const pendingMessageRequests = useRef(new Map<string, Promise<Message[]>>());
 
   // Access other contexts
   const { selectedClient, selectedClientId } = useClientContext();
@@ -267,33 +272,57 @@ export function ThreadProvider({ children }: ThreadProviderProps) {
 
     // Load messages from API if not already loaded
     if (!state.messagesByThread[threadId]) {
-      try {
-        let response = await fetch(`/api/threads/${threadId}/messages`);
-        if (!response.ok) {
-          response = await fetch(`/api/test-messages?threadId=${threadId}`);
-        }
-        if (response.ok) {
-          const data = await response.json();
-          const messages: Message[] = (data.data || []).map((m: Record<string, unknown>) => ({
-            id: m.id as string,
-            role: m.role as 'user' | 'assistant',
-            content: m.content as string,
-            timestamp: new Date(m.created_at as string).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-            citation: m.citation as Citation | undefined,
-            sources: m.sources as SourceChip[] | undefined,
-          }));
-          dispatch({
-            type: 'LOAD_PERSISTED_STATE',
-            payload: {
-              messagesByThread: {
-                ...state.messagesByThread,
-                [threadId]: messages,
+      // Check if there's already a pending request for this thread (deduplication)
+      if (pendingMessageRequests.current.has(threadId)) {
+        // Wait for the existing request instead of making a new one
+        await pendingMessageRequests.current.get(threadId);
+        return;
+      }
+
+      // Create the fetch promise
+      const fetchMessages = async (): Promise<Message[]> => {
+        try {
+          let response = await fetch(`/api/threads/${threadId}/messages`);
+          if (!response.ok) {
+            response = await fetch(`/api/test-messages?threadId=${threadId}`);
+          }
+          if (response.ok) {
+            const data = await response.json();
+            const messages: Message[] = (data.data || []).map((m: Record<string, unknown>) => ({
+              id: m.id as string,
+              role: m.role as 'user' | 'assistant',
+              content: m.content as string,
+              timestamp: new Date(m.created_at as string).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+              citation: m.citation as Citation | undefined,
+              sources: m.sources as SourceChip[] | undefined,
+            }));
+            dispatch({
+              type: 'LOAD_PERSISTED_STATE',
+              payload: {
+                messagesByThread: {
+                  ...state.messagesByThread,
+                  [threadId]: messages,
+                },
               },
-            },
-          });
+            });
+            return messages;
+          }
+          return [];
+        } catch (error) {
+          console.error('Failed to load messages:', error);
+          return [];
         }
-      } catch (error) {
-        console.error('Failed to load messages:', error);
+      };
+
+      // Store the promise for deduplication
+      const promise = fetchMessages();
+      pendingMessageRequests.current.set(threadId, promise);
+
+      try {
+        await promise;
+      } finally {
+        // Clean up after request completes
+        pendingMessageRequests.current.delete(threadId);
       }
     }
   }, [state.messagesByThread]);
@@ -341,6 +370,33 @@ export function ThreadProvider({ children }: ThreadProviderProps) {
   const setInputValue = useCallback((value: string) => {
     dispatch({ type: 'SET_INPUT_VALUE', payload: value });
   }, []);
+
+  // Cleanup empty threads (threads with 0 messages)
+  const cleanupEmptyThreads = useCallback(async () => {
+    const emptyThreadIds = state.threads
+      .filter((thread) => {
+        const messages = state.messagesByThread[thread.id] || [];
+        return messages.length === 0;
+      })
+      .map((t) => t.id);
+
+    if (emptyThreadIds.length === 0) return;
+
+    // Delete empty threads from API
+    for (const threadId of emptyThreadIds) {
+      try {
+        await fetch(`/api/threads/${threadId}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error('Failed to delete empty thread:', threadId, error);
+      }
+    }
+
+    // Update local state
+    dispatch({
+      type: 'SET_THREADS',
+      payload: state.threads.filter((t) => !emptyThreadIds.includes(t.id)),
+    });
+  }, [state.threads, state.messagesByThread]);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -606,6 +662,7 @@ export function ThreadProvider({ children }: ThreadProviderProps) {
     createThread,
     sendMessage,
     setInputValue,
+    cleanupEmptyThreads,
   };
 
   return <ThreadContext.Provider value={value}>{children}</ThreadContext.Provider>;

@@ -1,5 +1,6 @@
 export { ChatInput } from './ChatInput';
 export { CitationModal } from './CitationModal';
+export { ClientEditModal } from './ClientEditModal';
 export { ClientSelector } from './ClientSelector';
 export { ComparisonCard } from './ComparisonCard';
 export { DocumentUpload } from './DocumentUpload';

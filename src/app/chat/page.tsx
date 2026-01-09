@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChatProvider, useChat } from '@/context/ChatContext';
@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PageErrorFallback, PanelErrorFallback } from '@/components/error-fallbacks';
 import {
   CitationModal,
+  ClientEditModal,
   ClientSelector,
   ThreadList,
   MessageList,
@@ -25,8 +26,14 @@ import {
 // =============================================================================
 
 function RightSidebar() {
-  const { selectedClient, openDocumentViewer, openUploadModal, refreshClients } = useChat();
+  const { selectedClient, openDocumentViewer, openUploadModal, refreshClients, updateClient } = useChat();
   const { extractDocument, aggregateExtractions, isExtracting, getError, aggregating } = useDocumentExtraction();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Handle saving client updates
+  const handleSaveClient = async (updates: Partial<typeof selectedClient>) => {
+    return await updateClient(selectedClient.id, updates);
+  };
 
   // Check if a document is a PDF (can be extracted)
   const isPDF = (doc: { name: string; mimeType?: string }) => {
@@ -60,7 +67,19 @@ function RightSidebar() {
     <aside className="w-72 border-l border-border-01 bg-card flex flex-col flex-shrink-0 overflow-y-auto">
       {/* Client Info Card */}
       <div className="p-4 border-b border-border-01">
-        <div className="text-xs text-text-secondary mb-3">SSN: {selectedClient.ssn}</div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs text-text-secondary">SSN: {selectedClient.ssn}</div>
+          <button
+            type="button"
+            onClick={() => setIsEditModalOpen(true)}
+            className="p-1.5 text-text-tertiary hover:text-accent hover:bg-card-02 rounded transition-colors"
+            title="Edit client"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+        </div>
 
         <div className="flex items-center gap-2">
           <span
@@ -202,8 +221,19 @@ function RightSidebar() {
               </div>
             );
           })}
+          {selectedClient.documents.length === 0 && (
+            <p className="text-xs text-text-tertiary italic">No documents uploaded</p>
+          )}
         </div>
       </div>
+
+      {/* Client Edit Modal */}
+      <ClientEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        client={selectedClient}
+        onSave={handleSaveClient}
+      />
     </aside>
   );
 }
@@ -213,8 +243,16 @@ function RightSidebar() {
 // =============================================================================
 
 function ChatContent() {
-  const { selectedTask } = useChat();
+  const { selectedTask, cleanupEmptyThreads } = useChat();
   const { user, signOut } = useAuth();
+
+  // Cleanup empty threads when leaving the chat page
+  useEffect(() => {
+    return () => {
+      // Fire and forget - cleanup on unmount
+      cleanupEmptyThreads();
+    };
+  }, [cleanupEmptyThreads]);
 
   return (
     <>

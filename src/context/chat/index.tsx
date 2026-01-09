@@ -56,6 +56,7 @@ export function useChat() {
     refreshClients: client.refreshClients,
     addDocument: client.addDocument,
     uploadFile: client.uploadFile,
+    updateClient: client.updateClient,
 
     // Thread context
     threads: thread.threads,
@@ -69,6 +70,7 @@ export function useChat() {
     createThread: thread.createThread,
     sendMessage: thread.sendMessage,
     setInputValue: thread.setInputValue,
+    cleanupEmptyThreads: thread.cleanupEmptyThreads,
 
     // Streaming context
     isTyping: streaming.isTyping,

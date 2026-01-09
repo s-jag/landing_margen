@@ -57,9 +57,10 @@ export function useAuth() {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    router.push('/');
-    router.refresh();
-  }, [supabase.auth, router]);
+    // Use hard navigation to ensure cookies are cleared before redirect
+    // router.push can cause race conditions with middleware auth checks
+    window.location.href = '/';
+  }, [supabase.auth]);
 
   return {
     ...state,

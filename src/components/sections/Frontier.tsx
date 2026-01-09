@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
 export function Frontier() {
@@ -72,30 +72,19 @@ function FrontierCard({
 function ResearchTimer() {
   const [phase, setPhase] = useState<'traditional' | 'transition' | 'margen'>('traditional');
 
+  // Run animation once (no loop)
   useEffect(() => {
-    const cycle = () => {
-      setPhase('traditional');
+    // Show traditional for 2s
+    const t1 = setTimeout(() => setPhase('transition'), 2000);
 
-      // Show traditional for 2s
-      const t1 = setTimeout(() => setPhase('transition'), 2000);
+    // Transition for 0.5s then show margen
+    const t2 = setTimeout(() => setPhase('margen'), 2500);
 
-      // Transition for 0.5s then show margen
-      const t2 = setTimeout(() => setPhase('margen'), 2500);
-
-      // Show margen for 2.5s then restart
-      const t3 = setTimeout(() => setPhase('traditional'), 5000);
-
-      return [t1, t2, t3];
-    };
-
-    const timeouts = cycle();
-    const interval = setInterval(() => {
-      cycle();
-    }, 5000);
+    // Animation stays at 'margen' state - no restart
 
     return () => {
-      timeouts.forEach(clearTimeout);
-      clearInterval(interval);
+      clearTimeout(t1);
+      clearTimeout(t2);
     };
   }, []);
 
@@ -149,10 +138,13 @@ function ResearchTimer() {
 function SearchDemo() {
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [cycle, setCycle] = useState(0);
+  const hasPlayed = useRef(false);
   const fullText = 'Where is the QBI limitation defined?';
 
+  // Run animation once (no loop)
   useEffect(() => {
+    if (hasPlayed.current) return;
+
     // Start typing after a delay
     const startDelay = setTimeout(() => {
       setIsTyping(true);
@@ -164,12 +156,8 @@ function SearchDemo() {
           i++;
         } else {
           clearInterval(typeInterval);
-          // Pause then restart
-          setTimeout(() => {
-            setDisplayedText('');
-            setIsTyping(false);
-            setCycle(c => c + 1);
-          }, 3000);
+          hasPlayed.current = true;
+          // Animation stays at final state - no restart
         }
       }, 60);
 
@@ -177,7 +165,7 @@ function SearchDemo() {
     }, 1000);
 
     return () => clearTimeout(startDelay);
-  }, [cycle]);
+  }, []);
 
   return (
     <div className="bg-card-02 rounded-xs border border-border-01 p-4">
@@ -206,29 +194,19 @@ function SearchDemo() {
 function TaxProVisual() {
   const [visibleChecks, setVisibleChecks] = useState<number[]>([]);
 
+  // Run animation once (no loop)
   useEffect(() => {
-    const showChecks = () => {
-      setVisibleChecks([]);
+    // Stagger the checkmarks appearing
+    const t1 = setTimeout(() => setVisibleChecks([0]), 500);
+    const t2 = setTimeout(() => setVisibleChecks([0, 1]), 1000);
+    const t3 = setTimeout(() => setVisibleChecks([0, 1, 2]), 1500);
 
-      // Stagger the checkmarks appearing
-      const t1 = setTimeout(() => setVisibleChecks([0]), 500);
-      const t2 = setTimeout(() => setVisibleChecks([0, 1]), 1000);
-      const t3 = setTimeout(() => setVisibleChecks([0, 1, 2]), 1500);
-
-      // Reset after showing all for 3 seconds
-      const t4 = setTimeout(() => setVisibleChecks([]), 5000);
-
-      return [t1, t2, t3, t4];
-    };
-
-    const timeouts = showChecks();
-    const interval = setInterval(() => {
-      showChecks();
-    }, 5000);
+    // Animation stays at final state - no reset
 
     return () => {
-      timeouts.forEach(clearTimeout);
-      clearInterval(interval);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
     };
   }, []);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Animation timing constants (ms)
 const CHAR_SPEED = 25;           // Speed per character
@@ -191,15 +191,16 @@ export function ProductMockup() {
   const [phase, setPhase] = useState(0);
   const [visibleRows, setVisibleRows] = useState(0);
   const [key, setKey] = useState(0); // For resetting animation
+  const hasCompleted = useRef(false);
 
   // Phase progression callbacks
   const advancePhase = useCallback(() => {
     setPhase((p) => p + 1);
   }, []);
 
-  // Reset and loop
+  // Show spreadsheet rows (no loop restart)
   useEffect(() => {
-    if (phase === 6) {
+    if (phase === 6 && !hasCompleted.current) {
       // All text done, start spreadsheet rows
       const showRows = () => {
         let rowIndex = 0;
@@ -209,12 +210,8 @@ export function ProductMockup() {
             rowIndex++;
           } else {
             clearInterval(interval);
-            // Schedule loop restart
-            setTimeout(() => {
-              setPhase(0);
-              setVisibleRows(0);
-              setKey((k) => k + 1);
-            }, LOOP_PAUSE);
+            hasCompleted.current = true;
+            // Animation stays at final state - no restart
           }
         }, CODE_LINE_DELAY);
         return () => clearInterval(interval);

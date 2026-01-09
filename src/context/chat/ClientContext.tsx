@@ -6,6 +6,7 @@ import {
   useReducer,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { Client, Document, DocumentType } from '@/types/chat';
@@ -113,6 +114,7 @@ interface ClientContextValue extends ClientState {
   refreshClients: () => Promise<void>;
   addDocument: (name: string, type: DocumentType) => void;
   uploadFile: (file: File, type: DocumentType) => Promise<string | null>;
+  updateClient: (clientId: string, updates: Partial<Client>) => Promise<boolean>;
 }
 
 const ClientContext = createContext<ClientContextValue | null>(null);
@@ -125,8 +127,15 @@ interface ClientProviderProps {
   children: ReactNode;
 }
 
+// Stale time for client data (1 minute)
+const STALE_TIME = 60000;
+
 export function ClientProvider({ children }: ClientProviderProps) {
   const [state, dispatch] = useReducer(clientReducer, initialState);
+
+  // Cache management
+  const lastFetchTimestamp = useRef<number>(0);
+  const pendingRequest = useRef<Promise<Client[]> | null>(null);
 
   // Helper function to transform client data from API
   const transformClientData = useCallback((clientsData: { data?: Record<string, unknown>[] }): Client[] => {
@@ -163,6 +172,9 @@ export function ClientProvider({ children }: ClientProviderProps) {
           type: 'INITIAL_DATA_LOADED',
           payload: { clients: transformedClients },
         });
+
+        // Update cache timestamp
+        lastFetchTimestamp.current = Date.now();
       } catch (error) {
         console.error('Failed to load clients:', error);
         dispatch({
@@ -184,24 +196,51 @@ export function ClientProvider({ children }: ClientProviderProps) {
     dispatch({ type: 'SET_SELECTED_CLIENT', payload: clientId });
   }, []);
 
-  const refreshClients = useCallback(async () => {
-    try {
-      let response = await fetch('/api/clients');
-      if (!response.ok) {
-        response = await fetch('/api/test-clients');
-      }
-      if (response.ok) {
-        const data = await response.json();
-        const transformedClients = transformClientData(data);
-        if (transformedClients.length > 0) {
-          dispatch({ type: 'SET_CLIENTS', payload: transformedClients });
-          dispatch({ type: 'SET_SELECTED_CLIENT', payload: transformedClients[0].id });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to refresh clients:', error);
+  const refreshClients = useCallback(async (force = false) => {
+    // Skip if data is fresh (unless forced)
+    if (!force && Date.now() - lastFetchTimestamp.current < STALE_TIME && state.clients.length > 0) {
+      return;
     }
-  }, [transformClientData]);
+
+    // Return existing request if one is in progress (deduplication)
+    if (pendingRequest.current) {
+      await pendingRequest.current;
+      return;
+    }
+
+    const fetchClients = async (): Promise<Client[]> => {
+      try {
+        let response = await fetch('/api/clients');
+        if (!response.ok) {
+          response = await fetch('/api/test-clients');
+        }
+        if (response.ok) {
+          const data = await response.json();
+          const transformedClients = transformClientData(data);
+          if (transformedClients.length > 0) {
+            dispatch({ type: 'SET_CLIENTS', payload: transformedClients });
+            // Only update selected client if current selection is invalid
+            if (!transformedClients.find(c => c.id === state.selectedClientId)) {
+              dispatch({ type: 'SET_SELECTED_CLIENT', payload: transformedClients[0].id });
+            }
+          }
+          lastFetchTimestamp.current = Date.now();
+          return transformedClients;
+        }
+        return [];
+      } catch (error) {
+        console.error('Failed to refresh clients:', error);
+        return [];
+      }
+    };
+
+    pendingRequest.current = fetchClients();
+    try {
+      await pendingRequest.current;
+    } finally {
+      pendingRequest.current = null;
+    }
+  }, [transformClientData, state.clients.length, state.selectedClientId]);
 
   const addDocument = useCallback(
     (name: string, type: DocumentType) => {
@@ -253,6 +292,30 @@ export function ClientProvider({ children }: ClientProviderProps) {
     }
   }, [selectedClient]);
 
+  const updateClient = useCallback(async (clientId: string, updates: Partial<Client>): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/clients/${clientId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Update failed: ${response.status}`);
+      }
+
+      // Refresh clients to get updated data
+      await refreshClients();
+      return true;
+    } catch (error) {
+      console.error('Failed to update client:', error);
+      return false;
+    }
+  }, [refreshClients]);
+
   const value: ClientContextValue = {
     ...state,
     selectedClient,
@@ -260,6 +323,7 @@ export function ClientProvider({ children }: ClientProviderProps) {
     refreshClients,
     addDocument,
     uploadFile,
+    updateClient,
   };
 
   return <ClientContext.Provider value={value}>{children}</ClientContext.Provider>;
