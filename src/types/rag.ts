@@ -24,6 +24,7 @@ export interface UnifiedCitation {
   chunkId?: string;            // Florida: chunk ID for source details
   authorityLevel?: number;     // Utah: 1=highest authority
   link?: string;               // External URL to official source
+  canDrillInto?: boolean;      // Whether source supports drill-down
 }
 
 // =============================================================================

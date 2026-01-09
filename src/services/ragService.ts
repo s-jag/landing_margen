@@ -9,6 +9,17 @@ import type {
 } from '@/types/api';
 import { ragProviderRegistry } from '@/services/rag';
 import type { UnifiedRAGResponse, UnifiedStreamEvent, ClientContext } from '@/types/rag';
+import { fetchWithRetry, type RetryConfig } from '@/lib/retry';
+import { withCircuitBreaker } from '@/lib/circuitBreaker';
+
+// Retry configuration for direct RAG API calls
+const RAG_RETRY_CONFIG: Partial<RetryConfig> = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 30000,
+  backoffMultiplier: 2,
+  jitterFactor: 0.1,
+};
 
 // =============================================================================
 // CONFIGURATION
@@ -106,29 +117,40 @@ export function getStateCapabilities(stateCode: string) {
 
 export const ragService = {
   /**
-   * Execute a synchronous RAG query
+   * Execute a synchronous RAG query with retry logic
    */
   async query(
     query: string,
     options?: QueryOptions
   ): Promise<RAGQueryResponse> {
-    const response = await fetch(`${RAG_API_BASE_URL}/api/v1/query`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({
-        query,
-        options: {
-          doc_types: options?.docTypes,
-          tax_year: options?.taxYear,
-          expand_graph: options?.expandGraph ?? true,
-          include_reasoning: options?.includeReasoning ?? false,
-          timeout_seconds: options?.timeoutSeconds ?? 60,
+    return withCircuitBreaker('rag-florida-main', async () => {
+      const response = await fetchWithRetry(
+        `${RAG_API_BASE_URL}/api/v1/query`,
+        {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            query,
+            options: {
+              doc_types: options?.docTypes,
+              tax_year: options?.taxYear,
+              expand_graph: options?.expandGraph ?? true,
+              include_reasoning: options?.includeReasoning ?? false,
+              timeout_seconds: options?.timeoutSeconds ?? 60,
+            },
+          }),
+          signal: AbortSignal.timeout(options?.timeoutSeconds ? options.timeoutSeconds * 1000 : DEFAULT_TIMEOUT),
         },
-      }),
-      signal: AbortSignal.timeout(options?.timeoutSeconds ? options.timeoutSeconds * 1000 : DEFAULT_TIMEOUT),
-    });
+        RAG_RETRY_CONFIG,
+        {
+          onRetry: (error, attempt, delayMs) => {
+            console.warn(`[RAG Query] Retry attempt ${attempt} after ${delayMs}ms:`, error);
+          },
+        }
+      );
 
-    return handleResponse<RAGQueryResponse>(response);
+      return handleResponse<RAGQueryResponse>(response);
+    });
   },
 
   /**
@@ -232,154 +254,178 @@ export const ragService = {
   },
 
   /**
-   * Get detailed information about a source chunk
+   * Get detailed information about a source chunk with retry logic
    */
   async getSource(chunkId: string): Promise<SourceDetail> {
-    const response = await fetch(
-      `${RAG_API_BASE_URL}/api/v1/sources/${encodeURIComponent(chunkId)}`,
-      {
-        method: 'GET',
-        headers: getHeaders(),
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
-      }
-    );
+    return withCircuitBreaker('rag-florida-sources', async () => {
+      const response = await fetchWithRetry(
+        `${RAG_API_BASE_URL}/api/v1/sources/${encodeURIComponent(chunkId)}`,
+        {
+          method: 'GET',
+          headers: getHeaders(),
+          signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
+        },
+        { maxRetries: 2 }, // Fewer retries for source lookups
+        {
+          onRetry: (error, attempt, delayMs) => {
+            console.warn(`[RAG Source] Retry attempt ${attempt} after ${delayMs}ms:`, error);
+          },
+        }
+      );
 
-    const data = await handleResponse<{
-      chunk_id: string;
-      doc_id: string;
-      doc_type: string;
-      level: string;
-      text: string;
-      text_with_ancestry: string;
-      ancestry: string;
-      citation: string;
-      effective_date?: string;
-      token_count: number;
-      parent_chunk_id?: string;
-      child_chunk_ids: string[];
-      related_doc_ids: string[];
-    }>(response);
+      const data = await handleResponse<{
+        chunk_id: string;
+        doc_id: string;
+        doc_type: string;
+        level: string;
+        text: string;
+        text_with_ancestry: string;
+        ancestry: string;
+        citation: string;
+        effective_date?: string;
+        token_count: number;
+        parent_chunk_id?: string;
+        child_chunk_ids: string[];
+        related_doc_ids: string[];
+      }>(response);
 
-    return {
-      chunkId: data.chunk_id,
-      docId: data.doc_id,
-      docType: data.doc_type as 'statute' | 'rule' | 'case' | 'taa',
-      level: data.level,
-      text: data.text,
-      textWithAncestry: data.text_with_ancestry,
-      ancestry: data.ancestry,
-      citation: data.citation,
-      effectiveDate: data.effective_date,
-      tokenCount: data.token_count,
-      parentChunkId: data.parent_chunk_id,
-      childChunkIds: data.child_chunk_ids,
-      relatedDocIds: data.related_doc_ids,
-    };
+      return {
+        chunkId: data.chunk_id,
+        docId: data.doc_id,
+        docType: data.doc_type as 'statute' | 'rule' | 'case' | 'taa',
+        level: data.level,
+        text: data.text,
+        textWithAncestry: data.text_with_ancestry,
+        ancestry: data.ancestry,
+        citation: data.citation,
+        effectiveDate: data.effective_date,
+        tokenCount: data.token_count,
+        parentChunkId: data.parent_chunk_id,
+        childChunkIds: data.child_chunk_ids,
+        relatedDocIds: data.related_doc_ids,
+      };
+    });
   },
 
   /**
    * Get a statute with its implementing rules and interpreting documents
    */
   async getStatute(section: string): Promise<StatuteWithRules> {
-    const response = await fetch(
-      `${RAG_API_BASE_URL}/api/v1/statute/${encodeURIComponent(section)}`,
-      {
-        method: 'GET',
-        headers: getHeaders(),
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
-      }
-    );
+    return withCircuitBreaker('rag-florida-statute', async () => {
+      const response = await fetchWithRetry(
+        `${RAG_API_BASE_URL}/api/v1/statute/${encodeURIComponent(section)}`,
+        {
+          method: 'GET',
+          headers: getHeaders(),
+          signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
+        },
+        { maxRetries: 2 },
+        {
+          onRetry: (error, attempt, delayMs) => {
+            console.warn(`[RAG Statute] Retry attempt ${attempt} after ${delayMs}ms:`, error);
+          },
+        }
+      );
 
-    const data = await handleResponse<{
-      statute: {
-        doc_id: string;
-        title: string;
-        text: string;
-        effective_date: string;
+      const data = await handleResponse<{
+        statute: {
+          doc_id: string;
+          title: string;
+          text: string;
+          effective_date: string;
+        };
+        implementing_rules: Array<{ doc_id: string; title: string; citation: string }>;
+        interpreting_cases: Array<{ doc_id: string; title: string; citation: string }>;
+        interpreting_taas: Array<{ doc_id: string; title: string; citation: string }>;
+      }>(response);
+
+      return {
+        statute: {
+          docId: data.statute.doc_id,
+          title: data.statute.title,
+          text: data.statute.text,
+          effectiveDate: data.statute.effective_date,
+        },
+        implementingRules: data.implementing_rules.map((r) => ({
+          docId: r.doc_id,
+          title: r.title,
+          citation: r.citation,
+        })),
+        interpretingCases: data.interpreting_cases.map((c) => ({
+          docId: c.doc_id,
+          title: c.title,
+          citation: c.citation,
+        })),
+        interpretingTaas: data.interpreting_taas.map((t) => ({
+          docId: t.doc_id,
+          title: t.title,
+          citation: t.citation,
+        })),
       };
-      implementing_rules: Array<{ doc_id: string; title: string; citation: string }>;
-      interpreting_cases: Array<{ doc_id: string; title: string; citation: string }>;
-      interpreting_taas: Array<{ doc_id: string; title: string; citation: string }>;
-    }>(response);
-
-    return {
-      statute: {
-        docId: data.statute.doc_id,
-        title: data.statute.title,
-        text: data.statute.text,
-        effectiveDate: data.statute.effective_date,
-      },
-      implementingRules: data.implementing_rules.map((r) => ({
-        docId: r.doc_id,
-        title: r.title,
-        citation: r.citation,
-      })),
-      interpretingCases: data.interpreting_cases.map((c) => ({
-        docId: c.doc_id,
-        title: c.title,
-        citation: c.citation,
-      })),
-      interpretingTaas: data.interpreting_taas.map((t) => ({
-        docId: t.doc_id,
-        title: t.title,
-        citation: t.citation,
-      })),
-    };
+    });
   },
 
   /**
    * Get documents related via citations
    */
   async getRelatedDocs(docId: string): Promise<RelatedDocuments> {
-    const response = await fetch(
-      `${RAG_API_BASE_URL}/api/v1/graph/${encodeURIComponent(docId)}/related`,
-      {
-        method: 'GET',
-        headers: getHeaders(),
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
-      }
-    );
+    return withCircuitBreaker('rag-florida-graph', async () => {
+      const response = await fetchWithRetry(
+        `${RAG_API_BASE_URL}/api/v1/graph/${encodeURIComponent(docId)}/related`,
+        {
+          method: 'GET',
+          headers: getHeaders(),
+          signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
+        },
+        { maxRetries: 2 },
+        {
+          onRetry: (error, attempt, delayMs) => {
+            console.warn(`[RAG Related] Retry attempt ${attempt} after ${delayMs}ms:`, error);
+          },
+        }
+      );
 
-    const data = await handleResponse<{
-      doc_id: string;
-      citing_documents: Array<{ doc_id: string; doc_type: string; citation: string }>;
-      cited_documents: Array<{ doc_id: string; doc_type: string; citation: string }>;
-      interpretation_chain?: {
-        implementing_rules: Array<{ doc_id: string; citation: string }>;
-        interpreting_cases: Array<{ doc_id: string; citation: string }>;
-        interpreting_taas: Array<{ doc_id: string; citation: string }>;
+      const data = await handleResponse<{
+        doc_id: string;
+        citing_documents: Array<{ doc_id: string; doc_type: string; citation: string }>;
+        cited_documents: Array<{ doc_id: string; doc_type: string; citation: string }>;
+        interpretation_chain?: {
+          implementing_rules: Array<{ doc_id: string; citation: string }>;
+          interpreting_cases: Array<{ doc_id: string; citation: string }>;
+          interpreting_taas: Array<{ doc_id: string; citation: string }>;
+        };
+      }>(response);
+
+      return {
+        docId: data.doc_id,
+        citingDocuments: data.citing_documents.map((d) => ({
+          docId: d.doc_id,
+          docType: d.doc_type,
+          citation: d.citation,
+        })),
+        citedDocuments: data.cited_documents.map((d) => ({
+          docId: d.doc_id,
+          docType: d.doc_type,
+          citation: d.citation,
+        })),
+        interpretationChain: data.interpretation_chain
+          ? {
+              implementingRules: data.interpretation_chain.implementing_rules.map((r) => ({
+                docId: r.doc_id,
+                citation: r.citation,
+              })),
+              interpretingCases: data.interpretation_chain.interpreting_cases.map((c) => ({
+                docId: c.doc_id,
+                citation: c.citation,
+              })),
+              interpretingTaas: data.interpretation_chain.interpreting_taas.map((t) => ({
+                docId: t.doc_id,
+                citation: t.citation,
+              })),
+            }
+          : undefined,
       };
-    }>(response);
-
-    return {
-      docId: data.doc_id,
-      citingDocuments: data.citing_documents.map((d) => ({
-        docId: d.doc_id,
-        docType: d.doc_type,
-        citation: d.citation,
-      })),
-      citedDocuments: data.cited_documents.map((d) => ({
-        docId: d.doc_id,
-        docType: d.doc_type,
-        citation: d.citation,
-      })),
-      interpretationChain: data.interpretation_chain
-        ? {
-            implementingRules: data.interpretation_chain.implementing_rules.map((r) => ({
-              docId: r.doc_id,
-              citation: r.citation,
-            })),
-            interpretingCases: data.interpretation_chain.interpreting_cases.map((c) => ({
-              docId: c.doc_id,
-              citation: c.citation,
-            })),
-            interpretingTaas: data.interpretation_chain.interpreting_taas.map((t) => ({
-              docId: t.doc_id,
-              citation: t.citation,
-            })),
-          }
-        : undefined,
-    };
+    });
   },
 
   /**

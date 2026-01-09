@@ -3,10 +3,59 @@
  *
  * Uses Claude API to extract structured financial data from document text.
  * Server-side only - API key is never exposed to the client.
+ * Includes retry logic with exponential backoff for API resilience.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { ExtractedDocumentData } from '@/types/database';
+import { withRetry, type RetryConfig, isRetryableError } from '@/lib/retry';
+import { withCircuitBreaker } from '@/lib/circuitBreaker';
+
+// Retry configuration for Claude API calls
+// Note: Anthropic SDK has internal retries, but we add additional control
+const CLAUDE_RETRY_CONFIG: Partial<RetryConfig> = {
+  maxRetries: 2, // Fewer retries since Anthropic SDK also retries
+  baseDelayMs: 2000, // Longer base delay for rate limits
+  maxDelayMs: 60000,
+  backoffMultiplier: 2,
+  jitterFactor: 0.2,
+};
+
+/**
+ * Check if an Anthropic API error is retryable
+ */
+function isAnthropicRetryable(error: unknown): boolean {
+  // Check for rate limit errors
+  if (error && typeof error === 'object') {
+    const err = error as Record<string, unknown>;
+
+    // Anthropic rate limit error
+    if (err.status === 429) {
+      return true;
+    }
+
+    // Anthropic overload error
+    if (err.status === 529) {
+      return true;
+    }
+
+    // Server errors
+    if (typeof err.status === 'number' && err.status >= 500) {
+      return true;
+    }
+
+    // Check error type/name
+    if (err.error && typeof err.error === 'object') {
+      const innerError = err.error as Record<string, unknown>;
+      if (innerError.type === 'overloaded_error' || innerError.type === 'rate_limit_error') {
+        return true;
+      }
+    }
+  }
+
+  // Fall back to generic retryable check
+  return isRetryableError(error);
+}
 
 // Lazy initialization to avoid build-time errors
 let anthropicClient: Anthropic | null = null;
@@ -145,6 +194,11 @@ function normalizeNumber(value: unknown): number | null {
  * @param pdfText - The extracted text from the PDF
  * @param documentType - The type of document (W2, 1099, etc.)
  * @returns Structured extraction result
+ *
+ * Features:
+ * - Retry logic with exponential backoff for transient failures
+ * - Circuit breaker to prevent cascading failures
+ * - Rate limit awareness
  */
 export async function extractFinancialData(
   pdfText: string,
@@ -152,24 +206,40 @@ export async function extractFinancialData(
 ): Promise<ExtractedDocumentData> {
   const client = getAnthropicClient();
 
-  const response = await client.messages.create({
-    model: 'claude-3-5-haiku-20241022',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: buildExtractionPrompt(pdfText, documentType),
+  return withCircuitBreaker('claude-extraction', async () => {
+    return withRetry(
+      async () => {
+        const response = await client.messages.create({
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'user',
+              content: buildExtractionPrompt(pdfText, documentType),
+            },
+          ],
+        });
+
+        // Extract text content from response
+        const content = response.content[0];
+        if (content.type !== 'text') {
+          throw new Error('Unexpected response format from Claude');
+        }
+
+        return parseExtractionResponse(content.text, documentType);
       },
-    ],
+      CLAUDE_RETRY_CONFIG,
+      {
+        shouldRetry: isAnthropicRetryable,
+        onRetry: (error, attempt, delayMs) => {
+          console.warn(
+            `[Claude Extraction] Retry attempt ${attempt} after ${delayMs}ms:`,
+            error instanceof Error ? error.message : error
+          );
+        },
+      }
+    );
   });
-
-  // Extract text content from response
-  const content = response.content[0];
-  if (content.type !== 'text') {
-    throw new Error('Unexpected response format from Claude');
-  }
-
-  return parseExtractionResponse(content.text, documentType);
 }
 
 /**

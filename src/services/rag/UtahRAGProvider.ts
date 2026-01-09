@@ -35,17 +35,19 @@ export class UtahRAGProvider extends BaseRAGProvider {
     const startTime = Date.now();
 
     try {
-      const response = await fetch(this.buildUrl(this.config.endpoints.query), {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({
-          query,
-          include_trace: options?.includeTrace ?? false,
-        }),
-        signal: AbortSignal.timeout(this.getTimeout(options)),
-      });
+      const data = await this.fetchWithRetry<UtahQueryResponseRaw>(
+        this.buildUrl(this.config.endpoints.query),
+        {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({
+            query,
+            include_trace: options?.includeTrace ?? false,
+          }),
+          signal: AbortSignal.timeout(this.getTimeout(options)),
+        }
+      );
 
-      const data = await this.handleResponse<UtahQueryResponseRaw>(response);
       return this.transformResponse(data, Date.now() - startTime);
     } catch (error) {
       return this.createErrorResponse(error);
@@ -127,17 +129,16 @@ export class UtahRAGProvider extends BaseRAGProvider {
     }
 
     try {
-      const response = await fetch(this.buildUrl(this.config.endpoints.forms), {
-        method: 'GET',
-        headers: this.getHeaders(),
-        signal: AbortSignal.timeout(30000),
-      });
+      const data = await this.fetchWithRetry<{ forms: UtahFormInfo[] }>(
+        this.buildUrl(this.config.endpoints.forms),
+        {
+          method: 'GET',
+          headers: this.getHeaders(),
+          signal: AbortSignal.timeout(30000),
+        },
+        { retryConfig: { maxRetries: 2 } }
+      );
 
-      if (!response.ok) {
-        return [];
-      }
-
-      const data = await response.json() as { forms: UtahFormInfo[] };
       return (data.forms || []).map((form) => this.transformFormInfo(form));
     } catch {
       return [];
@@ -153,20 +154,16 @@ export class UtahRAGProvider extends BaseRAGProvider {
     }
 
     try {
-      const response = await fetch(
+      const data = await this.fetchWithRetry<UtahFormInfo>(
         this.buildUrl(`${this.config.endpoints.formDetail}/${encodeURIComponent(formNumber)}`),
         {
           method: 'GET',
           headers: this.getHeaders(),
           signal: AbortSignal.timeout(30000),
-        }
+        },
+        { retryConfig: { maxRetries: 2 } }
       );
 
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json() as UtahFormInfo;
       return this.transformFormInfo(data);
     } catch {
       return null;

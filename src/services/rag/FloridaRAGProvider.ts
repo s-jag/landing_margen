@@ -32,23 +32,25 @@ export class FloridaRAGProvider extends BaseRAGProvider {
     const enrichedQuery = this.enrichQuery(query, clientContext);
 
     try {
-      const response = await fetch(this.buildUrl(this.config.endpoints.query), {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({
-          query: enrichedQuery,
-          options: {
-            doc_types: options?.docTypes,
-            tax_year: options?.taxYear,
-            expand_graph: options?.expandGraph ?? true,
-            include_reasoning: options?.includeReasoning ?? false,
-            timeout_seconds: options?.timeoutSeconds ?? 60,
-          },
-        }),
-        signal: AbortSignal.timeout(this.getTimeout(options)),
-      });
+      const data = await this.fetchWithRetry<FloridaQueryResponseRaw>(
+        this.buildUrl(this.config.endpoints.query),
+        {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({
+            query: enrichedQuery,
+            options: {
+              doc_types: options?.docTypes,
+              tax_year: options?.taxYear,
+              expand_graph: options?.expandGraph ?? true,
+              include_reasoning: options?.includeReasoning ?? false,
+              timeout_seconds: options?.timeoutSeconds ?? 60,
+            },
+          }),
+          signal: AbortSignal.timeout(this.getTimeout(options)),
+        }
+      );
 
-      const data = await this.handleResponse<FloridaQueryResponseRaw>(response);
       return this.transformResponse(data, Date.now() - startTime);
     } catch (error) {
       return this.createErrorResponse(error);
@@ -161,20 +163,24 @@ export class FloridaRAGProvider extends BaseRAGProvider {
     }
 
     try {
-      const response = await fetch(
+      const data = await this.fetchWithRetry<{
+        chunk_id: string;
+        doc_id: string;
+        doc_type: string;
+        text: string;
+        text_with_ancestry: string;
+        citation: string;
+        effective_date?: string;
+      }>(
         this.buildUrl(`${this.config.endpoints.sources}/${encodeURIComponent(chunkId)}`),
         {
           method: 'GET',
           headers: this.getHeaders(),
           signal: AbortSignal.timeout(30000),
-        }
+        },
+        { retryConfig: { maxRetries: 2 } } // Fewer retries for source lookups
       );
 
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
       return {
         chunkId: data.chunk_id,
         docId: data.doc_id,

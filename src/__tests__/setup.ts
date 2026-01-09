@@ -71,7 +71,9 @@ vi.mock('next/server', async () => {
 // =============================================================================
 
 // Set test environment variables
-process.env.NODE_ENV = 'test';
+// Note: NODE_ENV is set by vitest, this is a backup for direct test runs
+// Using type assertion to avoid readonly error
+(process.env as Record<string, string>).NODE_ENV = 'test';
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';

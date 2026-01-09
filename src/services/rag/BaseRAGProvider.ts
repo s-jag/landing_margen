@@ -2,7 +2,7 @@
 // BASE RAG PROVIDER
 // =============================================================================
 // Abstract base class for all state RAG providers.
-// Provides common functionality like error handling, timeouts, and headers.
+// Provides common functionality like error handling, timeouts, headers, and retry logic.
 
 import type { StateRAGConfig, StateCapabilities, StateCode } from '@/config/stateConfig';
 import type {
@@ -12,8 +12,19 @@ import type {
   UnifiedRAGResponse,
   UnifiedStreamEvent,
 } from '@/types/rag';
+import { withRetry, type RetryConfig } from '@/lib/retry';
+import { withCircuitBreaker, CircuitOpenError } from '@/lib/circuitBreaker';
 
 const DEFAULT_TIMEOUT = 60000; // 60 seconds
+
+// Default retry configuration for RAG providers
+const DEFAULT_RETRY_CONFIG: Partial<RetryConfig> = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 30000,
+  backoffMultiplier: 2,
+  jitterFactor: 0.1,
+};
 
 export abstract class BaseRAGProvider implements RAGProviderInterface {
   protected config: StateRAGConfig;
@@ -170,6 +181,63 @@ export abstract class BaseRAGProvider implements RAGProviderInterface {
 
   protected delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Get the circuit breaker name for this provider.
+   */
+  protected getCircuitBreakerName(): string {
+    return `rag-${this.config.stateCode.toLowerCase()}`;
+  }
+
+  /**
+   * Execute a fetch request with retry logic and circuit breaker protection.
+   * Use this for all external API calls to ensure resilience.
+   */
+  protected async fetchWithRetry<T>(
+    url: string,
+    init: RequestInit,
+    options?: {
+      retryConfig?: Partial<RetryConfig>;
+      useCircuitBreaker?: boolean;
+      onRetry?: (error: unknown, attempt: number, delayMs: number) => void;
+    }
+  ): Promise<T> {
+    const {
+      retryConfig = DEFAULT_RETRY_CONFIG,
+      useCircuitBreaker = true,
+      onRetry,
+    } = options ?? {};
+
+    const fetchFn = async (): Promise<T> => {
+      const response = await fetch(url, init);
+      return this.handleResponse<T>(response);
+    };
+
+    // Wrap with retry logic
+    const retryFn = () =>
+      withRetry(fetchFn, retryConfig, {
+        onRetry: onRetry ?? ((error, attempt, delayMs) => {
+          console.warn(
+            `[${this.config.stateCode}] Retry attempt ${attempt} after ${delayMs}ms:`,
+            error instanceof Error ? error.message : error
+          );
+        }),
+      });
+
+    // Optionally wrap with circuit breaker
+    if (useCircuitBreaker) {
+      try {
+        return await withCircuitBreaker(this.getCircuitBreakerName(), retryFn);
+      } catch (error) {
+        if (error instanceof CircuitOpenError) {
+          console.warn(`[${this.config.stateCode}] Circuit breaker is open, failing fast`);
+        }
+        throw error;
+      }
+    }
+
+    return retryFn();
   }
 
   /**

@@ -7,6 +7,8 @@ import { ChatProvider, useChat } from '@/context/ChatContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useDocumentExtraction } from '@/hooks/useDocumentExtraction';
 import { getStateBadgeColor, formatCurrency, getDocIcon } from '@/lib/chatUtils';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PageErrorFallback, PanelErrorFallback } from '@/components/error-fallbacks';
 import {
   CitationModal,
   ClientSelector,
@@ -264,29 +266,62 @@ function ChatContent() {
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar - Clients & Chats */}
           <aside className="w-60 border-r border-border-01 bg-card flex flex-col flex-shrink-0">
-            <ClientSelector />
-            <ThreadList />
+            <ErrorBoundary
+              name="left-sidebar"
+              fallback={(props) => (
+                <div className="p-4">
+                  <PanelErrorFallback {...props} />
+                </div>
+              )}
+            >
+              <ClientSelector />
+              <ThreadList />
+            </ErrorBoundary>
           </aside>
 
           {/* Center - Chat Area or Task Detail */}
-          {selectedTask ? (
-            <TaskDetail />
-          ) : (
-            <main className="flex-1 flex flex-col bg-bg overflow-hidden">
-              <MessageList />
-              <ChatInput />
-            </main>
-          )}
+          <ErrorBoundary
+            name="center-panel"
+            fallback={(props) => (
+              <main className="flex-1 flex flex-col bg-bg overflow-hidden items-center justify-center">
+                <PanelErrorFallback {...props} />
+              </main>
+            )}
+          >
+            {selectedTask ? (
+              <TaskDetail />
+            ) : (
+              <main className="flex-1 flex flex-col bg-bg overflow-hidden">
+                <MessageList />
+                <ChatInput />
+              </main>
+            )}
+          </ErrorBoundary>
 
           {/* Right Panel - Context */}
-          <RightSidebar />
+          <ErrorBoundary
+            name="right-sidebar"
+            fallback={(props) => (
+              <aside className="w-72 border-l border-border-01 bg-card flex flex-col flex-shrink-0 p-4">
+                <PanelErrorFallback {...props} />
+              </aside>
+            )}
+          >
+            <RightSidebar />
+          </ErrorBoundary>
         </div>
       </div>
 
-      {/* Modals */}
-      <DocumentViewer />
-      <DocumentUpload />
-      <CitationModal />
+      {/* Modals - Each with its own boundary */}
+      <ErrorBoundary name="document-viewer-modal">
+        <DocumentViewer />
+      </ErrorBoundary>
+      <ErrorBoundary name="document-upload-modal">
+        <DocumentUpload />
+      </ErrorBoundary>
+      <ErrorBoundary name="citation-modal">
+        <CitationModal />
+      </ErrorBoundary>
     </>
   );
 }
@@ -335,8 +370,17 @@ export default function ChatPage() {
   }
 
   return (
-    <ChatProvider>
-      <ChatContent />
-    </ChatProvider>
+    <ErrorBoundary
+      name="chat-page"
+      fallback={(props) => (
+        <div className="h-screen bg-bg">
+          <PageErrorFallback {...props} />
+        </div>
+      )}
+    >
+      <ChatProvider>
+        <ChatContent />
+      </ChatProvider>
+    </ErrorBoundary>
   );
 }
