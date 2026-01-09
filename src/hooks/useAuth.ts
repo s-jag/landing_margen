@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
-import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
 interface AuthState {
   user: User | null;
@@ -19,6 +18,7 @@ export function useAuth() {
     error: null,
   });
 
+  const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
@@ -57,9 +57,9 @@ export function useAuth() {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    revalidatePath('/', 'layout');
-    redirect('/');
-  }, [supabase.auth]);
+    router.push('/');
+    router.refresh();
+  }, [supabase.auth, router]);
 
   return {
     ...state,
