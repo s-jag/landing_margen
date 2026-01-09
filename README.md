@@ -10,9 +10,12 @@ AI-powered tax research assistant built for speed and accuracy. Margen helps tax
 - **Authentication:** Supabase Auth
 - **Storage:** Supabase Storage
 - **AI Extraction:** Claude API (Anthropic)
+- **Rate Limiting:** Upstash Redis
 - **Styling:** Tailwind CSS
 - **Animation:** Framer Motion
 - **Validation:** Zod
+- **Testing:** Vitest + React Testing Library
+- **API Documentation:** OpenAPI/Swagger
 
 ## Getting Started
 
@@ -29,11 +32,14 @@ AI-powered tax research assistant built for speed and accuracy. Margen helps tax
    cp .env.example .env.local
    ```
 
-2. Fill in your Supabase credentials in `.env.local`:
+2. Fill in your credentials in `.env.local`:
    ```
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   UPSTASH_REDIS_REST_URL=your_upstash_url
+   UPSTASH_REDIS_REST_TOKEN=your_upstash_token
+   ANTHROPIC_API_KEY=your_anthropic_key
    ```
 
 3. Install dependencies:
@@ -70,12 +76,15 @@ src/
 │   │   ├── sources/      # Source chunk lookup
 │   │   ├── tasks/        # Task management
 │   │   ├── documents/    # Document upload/management
+│   │   ├── docs/         # OpenAPI/Swagger documentation
 │   │   └── health/       # Health check
 │   ├── chat/             # Research assistant interface
 │   └── ...
 ├── components/
 │   ├── auth/             # Auth form components
 │   ├── chat/             # Chat UI components
+│   ├── ErrorBoundary.tsx # Error boundary component
+│   ├── error-fallbacks/  # Error fallback UIs
 │   ├── features/         # Product mockups & demos
 │   ├── layout/           # Header, Footer, Navigation
 │   ├── sections/         # Landing page sections
@@ -83,30 +92,43 @@ src/
 ├── lib/
 │   ├── auth/             # Auth server actions
 │   ├── supabase/         # Supabase client utilities
-│   ├── constants.ts      # App constants
+│   ├── retry.ts          # Retry logic with exponential backoff
+│   ├── circuitBreaker.ts # Circuit breaker pattern
+│   ├── errorLogging.ts   # Structured error logging
+│   ├── openapi.ts        # OpenAPI spec generation
 │   ├── rateLimit.ts      # API rate limiting utility
+│   ├── env.ts            # Environment validation
 │   └── utils.ts          # Utility functions
 ├── services/
 │   ├── chatService.ts    # Chat API (sync & streaming)
-│   └── ragService.ts     # RAG API integration
+│   ├── ragService.ts     # RAG API integration
+│   └── rag/              # State-specific RAG providers
 ├── hooks/
 │   ├── useAuth.ts        # Authentication hook
 │   ├── useAutoScroll.ts  # Auto-scroll for chat
 │   └── useLocalStorage.ts # Persistent state
+├── context/
+│   └── chat/             # Chat state management (5 contexts)
 └── types/
     ├── api.ts            # API types & Zod schemas
     ├── database.ts       # Database types
-    └── index.ts          # General TypeScript types
+    └── rag.ts            # RAG provider types
 ```
 
 ## API Reference
+
+### Interactive Documentation
+
+API documentation is available via Swagger UI:
+- **Swagger UI:** [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+- **OpenAPI JSON:** [http://localhost:3000/api/docs/openapi.json](http://localhost:3000/api/docs/openapi.json)
 
 ### Authentication
 All API routes require authentication via Supabase Auth session cookies.
 
 ### Rate Limiting
 
-API endpoints are rate limited to prevent abuse:
+API endpoints are rate limited using Upstash Redis:
 
 | Endpoint | Limit | Window |
 |----------|-------|--------|
@@ -121,7 +143,17 @@ Rate limit headers are included in all responses:
 
 When rate limited, the API returns `429 Too Many Requests` with a `Retry-After` header.
 
-### Clients
+### API Resilience
+
+External API calls include automatic retry logic:
+- **Exponential Backoff:** Retries with increasing delays (1s, 2s, 4s...)
+- **Jitter:** Random delay variation to prevent thundering herd
+- **Circuit Breaker:** Prevents cascading failures when services are down
+- **Rate Limit Awareness:** Respects Retry-After headers
+
+### Endpoints
+
+#### Clients
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -132,7 +164,7 @@ When rate limited, the API returns `429 Too Many Requests` with a `Retry-After` 
 | `/api/clients/[id]` | DELETE | Delete client |
 | `/api/clients/[id]/documents` | GET | List client documents |
 
-### Threads & Messages
+#### Threads & Messages
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -143,7 +175,7 @@ When rate limited, the API returns `429 Too Many Requests` with a `Retry-After` 
 | `/api/threads/[id]/messages` | GET | List messages |
 | `/api/threads/[id]/messages` | POST | Create message |
 
-### RAG Query
+#### RAG Query
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -151,17 +183,7 @@ When rate limited, the API returns `429 Too Many Requests` with a `Retry-After` 
 | `/api/query/stream` | POST | Streaming RAG query (SSE) |
 | `/api/sources/[chunkId]` | GET | Get source details |
 
-### Tasks
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/tasks` | GET | List tasks |
-| `/api/tasks` | POST | Create task |
-| `/api/tasks/[id]` | GET | Get task |
-| `/api/tasks/[id]` | PUT | Update task |
-| `/api/tasks/[id]` | DELETE | Delete task |
-
-### Documents
+#### Documents
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -170,9 +192,8 @@ When rate limited, the API returns `429 Too Many Requests` with a `Retry-After` 
 | `/api/documents/[id]` | DELETE | Delete document |
 | `/api/documents/[id]/extract` | POST | Extract data from PDF using AI |
 | `/api/documents/[id]/extract` | GET | Get extraction status/result |
-| `/api/clients/[id]/aggregate-extractions` | POST | Aggregate all extractions and update client |
 
-### Health Check
+#### Health Check
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -201,69 +222,51 @@ Marketing page with:
 
 ### Chat Interface (`/chat`)
 
-Three-panel research assistant:
+Three-panel research assistant with error boundaries:
 - **Left:** Client selector + chat history
 - **Center:** Conversation with citations
 - **Right:** Client context & documents
 
-#### Streaming Features
+#### Features
 - **Real-time responses** - Progressive text display with blinking cursor
 - **Reasoning steps** - Collapsible timeline showing RAG processing
 - **Source chips** - Clickable references with relevance scores
 - **File upload** - Document type selector with drag-and-drop support
+- **Error recovery** - Isolated failures with retry functionality
 
-#### Components
+## Testing
+
+```bash
+# Run tests
+npm run test
+
+# Run tests with UI
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
 ```
-src/app/chat/components/
-├── MessageList.tsx      # Message display with streaming support
-├── ChatInput.tsx        # Input with file upload
-├── StreamingMessage.tsx # Progressive answer display
-├── ReasoningSteps.tsx   # RAG reasoning timeline
-├── SourceChips.tsx      # Clickable source references
-└── ...
-```
 
-## Features
-
-- **Audit-ready form completion** - Predictive data entry with traceable accuracy
-- **Complete tax code understanding** - Semantic search across IRC sections
-- **Multi-model support** - Access to Claude, GPT-4, Gemini, and more
-- **Enterprise ready** - Secure, scalable architecture for accounting firms
-- **AI Document Extraction** - Automatically extract financial data from uploaded PDFs
-
-### Document Extraction
-
-Upload tax documents (W-2, 1099, prior returns) and automatically extract financial data:
-
-**How it works:**
-1. Upload PDF document to client file
-2. Click "Extract" to process with Claude AI
-3. Extracted data (wages, income, withholdings) saved to document
-4. Click "Refresh" in Quick Facts to aggregate all extractions
-
-**Extracted Fields:**
-- W-2: Wages, federal/state withholding
-- 1099-NEC/MISC: Business income → Schedule C revenue
-- Prior Returns: AGI, Schedule C, dependents
-
-**Cost:** ~$0.001-0.005 per document using Claude 3.5 Haiku
+**Test Summary:**
+- 154 tests across 8 test files
+- Core utilities: 100% coverage
+- Context reducers: 94-98% coverage
 
 ## Security
 
-### Authentication & Authorization
-- All API routes require Supabase Auth session cookies
-- Row Level Security (RLS) policies enforce data isolation between organizations
-- Users can only access clients and threads belonging to their organization
+See [SECURITY.md](./SECURITY.md) for detailed security documentation.
 
-### Rate Limiting
-- In-memory sliding window rate limiting on all API endpoints
-- Per-user + IP-based identification
-- Configurable limits for different endpoint types (see API Reference)
+### Highlights
+
+- **SSN Protection:** Only last 4 digits stored (never full SSN)
+- **Authentication:** Supabase Auth with JWT tokens
+- **Authorization:** Row Level Security (RLS) on all tables
+- **Rate Limiting:** Distributed via Upstash Redis
+- **Input Validation:** Zod schemas on all inputs
+- **Error Handling:** Structured logging, no sensitive data exposure
 
 ### Test Endpoints
-Test endpoints (`/api/test-*`) are available for development but **blocked in production**:
-- Return `404 NOT_FOUND` when `NODE_ENV=production`
-- Production apps should use authenticated endpoints only
+Test endpoints (`/api/test-*`) are blocked in production (`NODE_ENV=production`).
 
 ## Environment Variables
 
@@ -272,6 +275,8 @@ Test endpoints (`/api/test-*`) are available for development but **blocked in pr
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anonymous key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
+| `UPSTASH_REDIS_REST_URL` | No | Upstash Redis URL for rate limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | No | Upstash Redis token |
 | `RAG_API_BASE_URL` | No | RAG API URL (default: http://localhost:8000) |
 | `RAG_API_KEY` | No | RAG API authentication key |
 | `ANTHROPIC_API_KEY` | No | Claude API key for document extraction |
@@ -307,6 +312,8 @@ Test endpoints (`/api/test-*`) are available for development but **blocked in pr
 | `npm run build` | Create production build |
 | `npm run start` | Run production server |
 | `npm run lint` | Run ESLint |
+| `npm run test` | Run tests |
+| `npm run test:coverage` | Run tests with coverage |
 
 ## License
 
