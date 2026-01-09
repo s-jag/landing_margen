@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 interface AuthState {
   user: User | null;
@@ -55,6 +57,8 @@ export function useAuth() {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    revalidatePath('/', 'layout');
+    redirect('/');
   }, [supabase.auth]);
 
   return {
