@@ -7,7 +7,6 @@ const CHAR_SPEED = 25;           // Speed per character
 const PAUSE_AFTER_TEXT = 400;    // Pause after finishing text
 const FILE_CARD_DELAY = 300;     // Delay before file card appears
 const CODE_LINE_DELAY = 150;     // Delay between code lines
-const LOOP_PAUSE = 4000;         // Pause before restarting
 
 // Content to type out
 const CONTENT = {
@@ -190,12 +189,18 @@ export function ProductMockup() {
   // Animation phase state machine
   const [phase, setPhase] = useState(0);
   const [visibleRows, setVisibleRows] = useState(0);
-  const [key, setKey] = useState(0); // For resetting animation
+  const hasStarted = useRef(false);
   const hasCompleted = useRef(false);
 
   // Phase progression callbacks
   const advancePhase = useCallback(() => {
     setPhase((p) => p + 1);
+  }, []);
+
+  // Prevent animation from restarting on remount
+  useEffect(() => {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
   }, []);
 
   // Show spreadsheet rows (no loop restart)
@@ -222,7 +227,7 @@ export function ProductMockup() {
   }, [phase]);
 
   return (
-    <div className="mockup-window max-w-5xl mx-auto" key={key}>
+    <div className="mockup-window max-w-5xl mx-auto">
       {/* Title bar */}
       <div className="mockup-titlebar">
         <div className="mockup-dots">
